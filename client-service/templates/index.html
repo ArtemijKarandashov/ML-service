@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Index page</title>
+    <meta charset="UTF-8"/>
+</head>
+<body>
+    <h1>Jinja2 test page</h1>
+    <h1>Загрузка файла</h1>
+    <form method="post" enctype="multipart/form-data" action="/api/v1/trainer/upload-model">
+        <label for="file">Выберите файл:</label>
+        <input type="file" name="file" id="file" required>
+        <br><br>
+        <button type="submit">Отправить</button>
+    </form>
+
+    {% if filename %}
+        <hr>
+        <p>Файл <strong>{{ filename }}</strong> успешно загружен!</p>
+    {% endif %}
+    <div>
+        <label for="uid">UID файла:</label>
+        <input type="text" id="uid" placeholder="Введите uid" style="width: 300px;">
+    </div>
+
+    <br>
+
+    <!-- Кнопка для удаления (DELETE) -->
+    <button onclick="deleteFile()">Удалить файл</button>
+
+    <!-- Кнопка для скачивания (GET) -->
+    <button onclick="downloadFile()">Скачать файл</button>
+
+    <!-- Блок для отображения результата удаления -->
+    <hr>
+    <div id="result" style="font-family: monospace; white-space: pre-wrap;"></div>
+    <script>
+        async function deleteFile() {
+            const uid = document.getElementById('uid').value.trim();
+            const resultDiv = document.getElementById('result');
+            if (!uid) {
+                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Удаление...';
+
+            try {
+                const response = await fetch(`/api/v1/trainer/delete-model/${uid}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const data = await response.json(); // {message, uid}
+                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message} (uid: ${data.uid})</span>`;
+                } else {
+                    let errorText = await response.text();
+                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+            }
+        }
+
+        function downloadFile() {
+            const uid = document.getElementById('uid').value.trim();
+            if (!uid) {
+                alert('Введите uid');
+                return;
+            }
+            // Просто перенаправляем браузер на URL скачивания
+            window.location.href = `/api/v1/trainer/get-model/${uid}`;
+        }
+    </script>
+</body>
+</html>
