@@ -63,7 +63,7 @@ async def store(
             shutil.copyfileobj(pkl_file.file, buffer)
 
         if not os.path.exists(file_path):
-            return HTTPException(status_code=404, detail="File not found. Failed to create .pkl file?")
+            raise HTTPException(status_code=404, detail="File not found. Failed to create .pkl file?")
         
         await database_service.create_pkl_file_entry(
             session=session,
