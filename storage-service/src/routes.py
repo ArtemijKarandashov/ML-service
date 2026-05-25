@@ -11,6 +11,7 @@ import uuid
 
 from .config import Config
 from .db import PklFileEntry, get_session
+from .db.models import ModelStatus
 from .service import PklFileService
 
 storage_router = APIRouter()
@@ -24,6 +25,32 @@ async def root(
     request: Request
 ):
     return {"message": "Storage service. Probably would show some data here later."}
+
+
+@storage_router.get("/info/{uid}", response_class=JSONResponse)
+async def get(
+    uid: str,
+    session: AsyncSession = Depends(get_session)
+):
+    try:
+        file_entry: PklFileEntry = await database_service.get_pkl_file_entry(
+            session=session,
+            uid=uid
+        )
+
+        if file_entry:
+            json_data = file_entry.model_dump_json()
+            return JSONResponse(status_code=200, content=json_data)
+        else:
+            raise HTTPException(status_code=404, detail="PklFileEntry with specified uid does not exist.")
+
+    except FileExistsError as e:
+        return HTTPException(status_code=404, detail="Cannot find file with specified uid.")
+    except PermissionError:
+        return HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
+    except OSError:
+        return HTTPException(status_code=500, detail="Unexpected error occured.")
+
 
 @storage_router.get("/get/{uid}", response_class=FileResponse)
 async def get(
@@ -58,6 +85,7 @@ async def store(
         uid = str(uuid.uuid4())
         name = pkl_file.filename
         file_path = os.path.join(Config.UPLOAD_DIR, uid)
+        status = ModelStatus.LOADED
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(pkl_file.file, buffer)
@@ -69,6 +97,7 @@ async def store(
             session=session,
             uid=uid,
             file_path=file_path,
+            status=status,
             name=name
         )
         return JSONResponse(status_code=200, content={"message": "File saved", "uid": uid})
