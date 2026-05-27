@@ -40,12 +40,14 @@ class PklFileService:
             session: AsyncSession, 
             uid: str,
             file_path: str,
+            status: str,
             name: str
         ):
 
         new_file = PklFileEntry(
             uid = uid,
             filepath=file_path,
+            status=status,
             name=name
         )
     
