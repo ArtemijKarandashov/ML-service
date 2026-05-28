@@ -39,7 +39,7 @@ async def predict(
 
 @predictor_router.post("/predict-from-csv", response_class=JSONResponse)
 async def predict_from_csv(
-    request: Request
+    csv: UploadFile
 ):
     """
     Accepts basic csv generated from train_test_split without any changes.
