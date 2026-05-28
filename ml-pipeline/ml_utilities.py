@@ -8,12 +8,28 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
-    mean_squared_error,
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+
+# Dictionary with the encoding strategies for categorical features
+encoding_strategy = {
+    "person_gender": lambda df, column: encode_binary(
+        df,
+        column,
+        "male",
+    ),
+    "previous_loan_defaults_on_file": lambda df, column: encode_binary(
+        df,
+        column,
+        "yes",
+    ),
+    "person_education": lambda df, column: encode_one_hot(df, column),
+    "person_home_ownership": lambda df, column: encode_one_hot(df, column),
+    "loan_intent": lambda df, column: encode_one_hot(df, column),
+}
 
 
 def read_dataframe(csv_path: str, csv_name: str) -> pd.DataFrame:
@@ -59,58 +75,18 @@ def encode_one_hot(df: pd.DataFrame, column: str) -> pd.DataFrame:
     return df_encoded
 
 
-# Dictionary with the encoding strategies for categorical features
-encoding_strategy = {
-    "person_gender": lambda df, column: encode_binary(
-        df,
-        column,
-        "male",
-    ),
-    "previous_loan_defaults_on_file": lambda df, column: encode_binary(
-        df,
-        column,
-        "yes",
-    ),
-    "person_education": lambda df, column: encode_one_hot(df, column),
-    "person_home_ownership": lambda df, column: encode_one_hot(df, column),
-    "loan_intent": lambda df, column: encode_one_hot(df, column),
-}
-
-
 def encode_columns(df_sanitized: pd.DataFrame, encoding_strategy: dict) -> pd.DataFrame:
     df_encoded = df_sanitized.copy()
 
     for column in df_encoded:
         if column in encoding_strategy:
-            print(f"Encoding column {column}")
             encoded_column = encoding_strategy[column](df_encoded, column)
             df_encoded = pd.concat(
                 [df_encoded.drop(column, axis=1), encoded_column],
                 axis=1,
             )
-    # TODO:
-    #  - drop unsupported columns
-
-    print("Encoding completed")
 
     return df_encoded
-
-
-def drop_low_corr_columns(
-    df: pd.DataFrame,
-    target_column: str,
-    drop_threshold: float = 0.004,
-) -> pd.DataFrame:
-    df_cleaned = df.copy()
-    correlation_series = df.corrwith(df[target_column]).abs()
-    for column in df.columns:
-        if correlation_series[column] < drop_threshold:
-            print(
-                f"Dropper column {column} with correlation {correlation_series[column]}",
-            )
-            df_cleaned.drop(column, axis=1)
-
-    return df_cleaned
 
 
 def split_data(df, target_column: str, test_size: float = 0.1) -> tuple:
@@ -156,7 +132,7 @@ def get_model_metrics(
     model: Any,
     x_test: pd.DataFrame,
     y_test: pd.Series,
-) -> dict[str, float | np.ndarray]:
+) -> dict[str, float, np.ndarray]:
     test_prediction = model.predict(x_test)
     metrics = {
         "accuracy": accuracy_score(y_test, test_prediction),
@@ -184,6 +160,24 @@ def predict_with_model(model: Any, data: pd.DataFrame) -> np.ndarray:
     prediction = model.predict(data)
 
     return prediction
+
+
+# Unused
+def drop_low_corr_columns(
+    df: pd.DataFrame,
+    target_column: str,
+    drop_threshold: float = 0.004,
+) -> pd.DataFrame:
+    df_cleaned = df.copy()
+    correlation_series = df.corrwith(df[target_column]).abs()
+    for column in df.columns:
+        if correlation_series[column] < drop_threshold:
+            print(
+                f"Dropper column {column} with correlation {correlation_series[column]}",
+            )
+            df_cleaned.drop(column, axis=1)
+
+    return df_cleaned
 
 
 # learner pipeline:
@@ -232,11 +226,3 @@ df_processed = drop_low_corr_columns(df_encoded, target_column)
 model = load_model(models_dir, model_name)
 prediction = predict_with_model(model, df_processed)
 """
-
-
-def main():
-    print("Hello from ml-service!")
-
-
-if __name__ == "__main__":
-    print(save_model.__code__.co_varnames[: save_model.__code__.co_argcount])
