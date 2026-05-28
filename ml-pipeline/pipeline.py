@@ -1,10 +1,8 @@
 import logging
-import os
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from pathlib import Path
 
 import pandas as pd
-
 from ml_utilities import (
     create_rnd_forest_classifier,
     encode_columns,
@@ -26,10 +24,10 @@ def setup_logger(
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
 
-    filename = os.path.join(file_path, file_name)
+    filename = Path().joinpath(file_path, file_name)
 
-    if filename and not os.path.exists(os.path.dirname(file_path)):
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+    Path(file_path).mkdir(parents=True, exist_ok=True)
+    Path(filename).touch(exist_ok=True)
 
     if filename is None:
         return logger
@@ -45,7 +43,7 @@ def setup_logger(
     logger.addHandler(console_handler)
 
     file_handler = logging.FileHandler(filename, mode="w")
-    file_handler.setLevel(logging.ERROR)
+    file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
@@ -56,7 +54,7 @@ class PipelineStep(ABC):
     """Base (and based) step for pipeline."""
 
     @abstractmethod
-    def execute(self, **kwargs) -> Optional[Union[pd.DataFrame, object]]:
+    def execute(self, **kwargs) -> pd.DataFrame | object | None:
         pass
 
     def _handle_error(self, step_name: str, error: Exception):
@@ -68,7 +66,7 @@ class LoadDataStep(PipelineStep):
         self.csv_path = csv_path
         self.csv_name = csv_name
 
-    def execute(self, context: dict) -> Optional[pd.DataFrame]:
+    def execute(self, context: dict) -> pd.DataFrame | None:
         try:
             logging.info(f"Loading data from {self.csv_path}/{self.csv_name}")
             df = read_dataframe(self.csv_path, self.csv_name)
@@ -87,10 +85,10 @@ class LoadDataStep(PipelineStep):
 
 
 class EncodeDataStep(PipelineStep):
-    def __init__(self, encoding_strategy: Dict[str, Callable]):
+    def __init__(self, encoding_strategy: dict[str, callable]):
         self.encoding_strategy = encoding_strategy
 
-    def execute(self, context: dict) -> Optional[pd.DataFrame]:
+    def execute(self, context: dict) -> pd.DataFrame | None:
         try:
             df_loaded = context["df_loaded"].copy()
 
@@ -112,7 +110,7 @@ class CleanDataStep(PipelineStep):
     def __init__(self, operational_columns: list):
         self.operational_columns = operational_columns
 
-    def execute(self, context: dict) -> Optional[pd.DataFrame]:
+    def execute(self, context: dict) -> pd.DataFrame | None:
         try:
             df_encoded = context["df_encoded"].copy()
 
@@ -144,9 +142,7 @@ class SplitDataStep(PipelineStep):
         self.test_size = test_size
         self.random_state = random_state
 
-    def execute(
-        self, context: dict
-    ) -> Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+    def execute(self, context: dict) -> dict | None:
         try:
             df_clean = context["df_clean"]
 
@@ -178,9 +174,8 @@ class TrainModelStep(PipelineStep):
         self.random_state = random_state
         self.n_jobs = n_jobs
 
-    def execute(self, context: dict) -> Optional[object]:
+    def execute(self, context: dict) -> dict | None:
         try:
-            # create_model = context["create_model"]
             x_train = context["x_train"]
             y_train = context["y_train"]
 
@@ -206,7 +201,7 @@ class EvaluateMetricsStep(PipelineStep):
     def __init__(self):
         pass
 
-    def execute(self, context: dict) -> Optional[Dict]:
+    def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
             x_test, y_test = context["x_train"], context["y_train"]
@@ -233,7 +228,7 @@ class SaveModelStep(PipelineStep):
         self.save_dir = save_dir
         self.model_name = model_name
 
-    def execute(self, context: dict) -> Optional[Dict]:
+    def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
             logging.info(f"Сохранение модели в {self.save_dir}/{self.model_name}")
@@ -254,7 +249,7 @@ class LoadModelStep(PipelineStep):
         self.model_path = model_path
         self.model_name = model_name
 
-    def execute(self, context: dict):
+    def execute(self, context: dict) -> dict | None:
         try:
             logging.info(f"Loading model from {self.model_path}/{self}")
             trained_model = load_model(self.model_path, self.model_name)
@@ -273,7 +268,7 @@ class PredictionStep(PipelineStep):
     def __init__(self):
         pass
 
-    def execute(self, context: dict):
+    def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
             df_clean = context["df_clean"].copy()
@@ -295,7 +290,7 @@ class StrategyPipeline:
     def __init__(self, steps: list[PipelineStep]):
         self.steps = steps
 
-    def run(self, context):
+    def run(self, context) -> dict:
         for step in self.steps:
             context = step.execute(context)
         return context
@@ -335,8 +330,7 @@ def build_training_pipeline(
             CleanDataStep(operational_columns=operational_columns),
             SplitDataStep(target_column=target_column, test_size=0.1),
             TrainModelStep(create_model=create_model),
-            # May break pipeline
-            # EvaluateMetricsStep() if enable_metrics else None,
+            EvaluateMetricsStep() if enable_metrics else None,
             SaveModelStep(save_dir=save_dir, model_name=model_name),
         ],
     )
@@ -346,7 +340,7 @@ def build_training_pipeline(
 
 def run_training_pipeline(config: dict, context: dict):
     """Wrapper for config based pipeline."""
-    logger = setup_logger("ml_pipeline.log")
+    logger = setup_logger()
     logger.info("Starting model training pipeline...")
 
     try:
@@ -369,11 +363,12 @@ def run_training_pipeline(config: dict, context: dict):
         if result["model_saved"]:
             logger.info("Pipeline seccessfully executed")
 
-        return result
-
     except Exception as e:
         logger.exception(f"Crite error during pipeline execution. Error: {e}")
         return None
+
+    else:
+        return result
 
 
 def build_inference_pipeline(
@@ -383,14 +378,8 @@ def build_inference_pipeline(
     model_name: str,
     operational_columns: list,
     encoding_strategy: dict,
-    # x_train_shape_descriptor=None,  # Data structure dicriptor for validation
 ):
     """Fabric function to build a inference pipeline."""
-    # pipeline = StrategyPipeline(target_column=target_column)
-    # pipeline.add_step(LoadDataStep(csv_path="data", csv_name="loan_status.csv"))
-    # pipeline.add_step(EncodeDataStep(encoding_strategy=encoding_stategy))
-    # pipeline.add_step(CleanDataStep(target_column=target_column))
-
     # predictor pipeline:
     # get pd.DataFrame
     # prepare data for the model
@@ -445,11 +434,10 @@ def run_inference_pipeline(config: dict, context: dict):
 
 if __name__ == "__main__":
     pretty_printing = True
-    run_training = False
-    run_inference = True
+    run_training = True
+    run_inference = False
 
     config_train = {
-        # training config UNFINISHED
         "data": {"csv_path": "data", "csv_name": "loan_data.csv"},
         "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
         "target_column": "loan_status",
@@ -485,7 +473,6 @@ if __name__ == "__main__":
     }
 
     config_inference = {
-        # inference config UNFINISHED
         "data": {"csv_path": "data", "csv_name": "loan_data_copy.csv"},
         "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
         "operational_columns": [
@@ -516,7 +503,6 @@ if __name__ == "__main__":
         "encoding_strategy": encoding_strategy,
     }
 
-    # try:
     if run_training:
         if pretty_printing:
             print("=" * 50)
@@ -525,17 +511,18 @@ if __name__ == "__main__":
 
         context: dict = {}
         result_train = run_training_pipeline(config_train, context)
+
         if result_train:
             print("Модель успешно обучена и сохранена.")
+            if config_train["enable_metrics"]:
+                print(f"model metrics:", result_train["metrics"])
         else:
             print("Обучение завершено с ошибками (см. лог).")
-    # except Exception as e:
-    #     print(f"Исключение во время обучения: {e}")
 
     if run_inference:
         if pretty_printing:
             print("\n" + "=" * 50)
-            print("2. ЗАПУСК ИНФЕРЕНСА")
+            print("ЗАПУСК ИНФЕРЕНСА")
             print("=" * 50)
 
         context: dict = {}
