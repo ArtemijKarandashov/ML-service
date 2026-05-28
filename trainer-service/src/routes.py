@@ -11,3 +11,9 @@ import uuid
 from .config import Config
 
 trainer_router = APIRouter()
+
+@trainer_router.post("/train")
+async def train(
+    uid: str
+):
+    pass
