@@ -1,0 +1,78 @@
+services:
+  client-service:
+    build:
+      context: ./client-service
+      dockerfile: Dockerfile
+    container_name: client-service
+    ports:
+      - "8080:8080"
+    environment:
+      - CLIENT_SERVICE_PORT=8080
+      - STORAGE_SERVICE_API=http://storage-service:8081
+      - TRAINER_SERVICE_API=http://predictor-service:8082
+      - PREDICTOR_SERVICE_API=http://predictor-service:8083
+    depends_on:
+      - storage-service
+      - predictor-service
+      - trainer-service
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  storage-service:
+    build:
+      context: ./storage-service
+      dockerfile: Dockerfile
+    container_name: storage-service
+    ports:
+      - "8001:8001"
+    environment:
+      - UPLOAD_DIR=/data/uploads
+      - SQLITE_URL=sqlite+aiosqlite:///data/storedfiles.db
+      - STORAGE_SERVICE_PORT=8081
+    volumes:
+      - data:/data               
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  trainer-service:
+    build:
+      context: ./trainer-service
+      dockerfile: Dockerfile
+    container_name: trainer-service
+    ports:
+      - "8082:8082"
+    environment:
+      - TRAINER_SERVICE_PORT=8082
+      - STORAGE_SERVICE_API=http://storage-service:8081
+    depends_on:
+      - storage-service
+    networks:
+      - app-network
+    restart: unless-stopped
+    # limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
+
+  # predictor-service:
+  #   build:
+  #     context: ./predictor-service
+  #     dockerfile: Dockerfile
+  #   container_name: predictor-service
+  #   ports:
+  #     - "8083:8083"
+  #   environment:
+  #     - STORAGE_SERVICE_API=http://storage-service:8081
+  #   depends_on:
+  #     - storage-service
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+
+
+networks:
+  app-network:
+    driver: bridge
