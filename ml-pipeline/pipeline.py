@@ -5,9 +5,7 @@ from pathlib import Path
 import pandas as pd
 from create_models import create_logistic_regression_model, create_rnd_forest_classifier
 from dataframe_encoder import (
-    encode_binary,
     encode_columns,
-    encode_one_hot,
     encoding_strategy,
 )
 from dataframe_reader import read_csv_from_bytes, read_dataframe
