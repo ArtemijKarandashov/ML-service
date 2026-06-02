@@ -3,90 +3,12 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-
-# Dictionary with the encoding strategies for categorical features
-encoding_strategy = {
-    "person_gender": lambda df, column: encode_binary(
-        df,
-        column,
-        "male",
-    ),
-    "previous_loan_defaults_on_file": lambda df, column: encode_binary(
-        df,
-        column,
-        "yes",
-    ),
-    "person_education": lambda df, column: encode_one_hot(df, column),
-    "person_home_ownership": lambda df, column: encode_one_hot(df, column),
-    "loan_intent": lambda df, column: encode_one_hot(df, column),
-}
-
-
-def read_dataframe(csv_path: str, csv_name: str) -> pd.DataFrame:
-    # TODO:
-    # checks:
-    #   - file exists?
-    #   - is it csv?
-    df = pd.read_csv(csv_path + "/" + csv_name)
-
-    return df
-
-
-def encode_binary(df: pd.DataFrame, column: str, target_value: str) -> pd.DataFrame:
-    """
-    Encodes a binary categorical feature into an integer value.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The name of the column to be encoded.
-        target_value (str): The target value for the encoding.
-
-    Returns:
-        pd.DataFrame: A new DataFrame with the encoded column appended.
-
-    """
-    df_encoded = df[column].apply(
-        lambda value: 1 if value.lower() == target_value else 0,
-    )
-    df_encoded.rename(str(column + "_encoded"), inplace=True)
-
-    return df_encoded
-
-
-def encode_one_hot(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    df_encoded = (
-        pd.get_dummies(
-            df[column].apply(pd.Series).stack(),
-        )
-        .groupby(level=0)
-        .sum()
-    )
-
-    return df_encoded
-
-
-def encode_columns(df_sanitized: pd.DataFrame, encoding_strategy: dict) -> pd.DataFrame:
-    df_encoded = df_sanitized.copy()
-
-    for column in df_encoded:
-        if column in encoding_strategy:
-            encoded_column = encoding_strategy[column](df_encoded, column)
-            df_encoded = pd.concat(
-                [df_encoded.drop(column, axis=1), encoded_column],
-                axis=1,
-            )
-
-    return df_encoded
 
 
 def split_data(df, target_column: str, test_size: float = 0.1) -> tuple:
@@ -98,34 +20,6 @@ def split_data(df, target_column: str, test_size: float = 0.1) -> tuple:
     )
 
     return x_train, x_test, y_train, y_test
-
-
-def create_logistic_regression_model(
-    x_train: pd.DataFrame,
-    y_train: pd.Series,
-) -> LogisticRegression:
-    logreg_model = make_pipeline(
-        StandardScaler(),
-        LogisticRegression(random_state=0, n_jobs=-1),
-    )
-    logreg_model.fit(x_train, y_train)
-
-    return logreg_model
-
-
-def create_rnd_forest_classifier(
-    x_train: pd.DataFrame,
-    y_train: pd.Series,
-    random_state: int = 0,
-    n_jobs: int = -1,
-) -> RandomForestClassifier:
-    rnd_forest_classifier = make_pipeline(
-        StandardScaler(),
-        RandomForestClassifier(random_state=random_state, n_jobs=n_jobs),
-    )
-    rnd_forest_classifier.fit(x_train, y_train)
-
-    return rnd_forest_classifier
 
 
 def get_model_metrics(
@@ -146,6 +40,7 @@ def get_model_metrics(
 def save_model(model: Any, path: str, model_name: str) -> None:
     with open(path + "/" + model_name, "wb") as file:
         pickle.dump(model, file)
+        print(f"type of model: {type(model)}")
         print(f"Model {model_name} saved to {path}")
 
 
@@ -160,6 +55,35 @@ def predict_with_model(model: Any, data: pd.DataFrame) -> np.ndarray:
     prediction = model.predict(data)
 
     return prediction
+
+
+def balance_dateframe(
+    df: pd.DataFrame,
+    target_column: str,
+    cutout_threshold: float = 0.65,
+    random_state: int = 0,
+) -> pd.DataFrame:
+    df_zeros = df[df[target_column] == 0]
+    df_ones = df[df[target_column] == 1]
+
+    df_minority, df_majoruty = df_zeros, df_ones
+    if len(df_ones) <= len(df_zeros):
+        df_minority, df_majoruty = df_ones, df_zeros
+
+    delta = len(df_majoruty) - len(df_minority)
+    # if skew is extreme (difference is greater than 65%) return original dataframe (data is garbage anyway)
+    if delta / len(df) >= cutout_threshold:
+        return df
+
+    print(f"zeros:\n{len(df_zeros)}")
+    print(f"ones:\n{len(df_ones)}")
+
+    df_majority_downsampled = df_majoruty.sample(
+        n=len(df_minority), random_state=random_state
+    )
+    df_balanced = pd.concat([df_majority_downsampled, df_minority], axis=0)
+
+    return df_balanced
 
 
 # Unused

@@ -3,14 +3,19 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import pandas as pd
-from ml_utilities import (
-    create_rnd_forest_classifier,
+from create_models import create_logistic_regression_model, create_rnd_forest_classifier
+from dataframe_encoder import (
+    encode_binary,
     encode_columns,
+    encode_one_hot,
     encoding_strategy,
+)
+from dataframe_reader import read_csv_from_bytes, read_dataframe
+from ml_utilities import (
+    balance_dateframe,
     get_model_metrics,
     load_model,
     predict_with_model,
-    read_dataframe,
     save_model,
     split_data,
 )
@@ -37,10 +42,10 @@ def setup_logger(
     )
 
     # Консольный вывод (надо?)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # console_handler = logging.StreamHandler()
+    # console_handler.setLevel(logging.INFO)
+    # console_handler.setFormatter(formatter)
+    # logger.addHandler(console_handler)
 
     file_handler = logging.FileHandler(filename, mode="w")
     file_handler.setLevel(logging.INFO)
@@ -61,7 +66,7 @@ class PipelineStep(ABC):
         logging.error(f"Step '{step_name}' yeld error: \n{error}.")
 
 
-class LoadDataStep(PipelineStep):
+class LoadDataCSVStep(PipelineStep):
     def __init__(self, csv_path: str, csv_name: str):
         self.csv_path = csv_path
         self.csv_name = csv_name
@@ -70,6 +75,28 @@ class LoadDataStep(PipelineStep):
         try:
             logging.info(f"Loading data from {self.csv_path}/{self.csv_name}")
             df = read_dataframe(self.csv_path, self.csv_name)
+
+            if df.empty:
+                raise ValueError("Loaded pd.DataFrame is empty.")
+
+            context["df_loaded"] = df
+
+        except Exception as e:
+            self._handle_error("LoadData", e)
+            return None
+
+        else:
+            return context
+
+
+class LoadDataBytesStep(PipelineStep):
+    def __init__(self, csv_bytes: bytes):
+        self.csv_bytes = csv_bytes
+
+    def execute(self, context: dict) -> pd.DataFrame | None:
+        try:
+            logging.info(f"Loading data from bytes")
+            df = read_csv_from_bytes(self.csv_bytes)
 
             if df.empty:
                 raise ValueError("Loaded pd.DataFrame is empty.")
@@ -114,7 +141,7 @@ class CleanDataStep(PipelineStep):
         try:
             df_encoded = context["df_encoded"].copy()
 
-            logging.info(f"Deleting columns with low correlation...")
+            logging.info("Deleting columns with low correlation...")
             df_clean = df_encoded.drop(
                 df_encoded.columns.difference(self.operational_columns),
                 axis=1,
@@ -125,6 +152,32 @@ class CleanDataStep(PipelineStep):
 
         except Exception as e:
             self._handle_error("CleanData", e)
+            return None
+
+        else:
+            return context
+
+
+class BalanceDataStep(PipelineStep):
+    def __init__(self, target_column: str, cutout_threshold: float = 0.7):
+        self.target_column = target_column
+        self.cutout_threshold = cutout_threshold
+
+    def execute(self, context: dict) -> dict:
+        try:
+            df_clean = context["df_clean"].copy()
+
+            logging.info("Balancing dataframe")
+            df_clean = balance_dateframe(
+                df_clean,
+                self.target_column,
+                self.cutout_threshold,
+            )
+
+            context["df_clean"] = df_clean
+
+        except Exception as e:
+            self._handle_error("BalanceData", e)
             return None
 
         else:
@@ -204,7 +257,7 @@ class EvaluateMetricsStep(PipelineStep):
     def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
-            x_test, y_test = context["x_train"], context["y_train"]
+            x_test, y_test = context["x_test"], context["y_test"]
 
             logging.info("Evaluate model metrics...")
             metrics = get_model_metrics(trained_model, x_test, y_test)
@@ -293,18 +346,24 @@ class StrategyPipeline:
     def run(self, context) -> dict:
         for step in self.steps:
             context = step.execute(context)
+            # print("Context: ", context)
+            # try:
+            #     print("Context: ", context["df_clean"].info())
+            # except Exception:
+            #     pass
         return context
 
 
 def build_training_pipeline(
-    csv_path: str,
-    csv_name: str,
+    # csv_path: str,
+    # csv_name: str,
+    csv_bytes: bytes,
     model_name: str,
     save_dir: str,
     encoding_strategy: dict,
     operational_columns: list,
-    target_column: str,
     enable_metrics: bool = True,
+    target_column: str = "loan_status",
     create_model: callable = create_rnd_forest_classifier,
 ):
     """Fabric function to build a training pipeline."""
@@ -325,9 +384,10 @@ def build_training_pipeline(
 
     pipeline = StrategyPipeline(
         [
-            LoadDataStep(csv_path=csv_path, csv_name=csv_name),
+            LoadDataBytesStep(csv_bytes=csv_bytes),
             EncodeDataStep(encoding_strategy=encoding_strategy),
             CleanDataStep(operational_columns=operational_columns),
+            BalanceDataStep(target_column=target_column),
             SplitDataStep(target_column=target_column, test_size=0.1),
             TrainModelStep(create_model=create_model),
             EvaluateMetricsStep() if enable_metrics else None,
@@ -345,8 +405,8 @@ def run_training_pipeline(config: dict, context: dict):
 
     try:
         training_pipeline = build_training_pipeline(
-            csv_path=config["data"]["csv_path"],
-            csv_name=config["data"]["csv_name"],
+            csv_bytes=config["data"]["csv_bytes"],
+            # csv_name=config["data"]["csv_name"],
             model_name=config["model"]["name"],
             save_dir=config["model"]["save_dir"],
             encoding_strategy=config["encoding_strategy"],
@@ -372,8 +432,7 @@ def run_training_pipeline(config: dict, context: dict):
 
 
 def build_inference_pipeline(
-    csv_path: str,
-    csv_name: str,
+    csv_bytes: bytes,
     model_path: str,
     model_name: str,
     operational_columns: list,
@@ -393,7 +452,7 @@ def build_inference_pipeline(
 
     pipeline = StrategyPipeline(
         [
-            LoadDataStep(csv_path=csv_path, csv_name=csv_name),
+            LoadDataBytesStep(csv_bytes),
             EncodeDataStep(encoding_strategy=encoding_strategy),
             CleanDataStep(operational_columns=operational_columns),
             LoadModelStep(model_path=model_path, model_name=model_name),
@@ -411,8 +470,7 @@ def run_inference_pipeline(config: dict, context: dict):
 
     try:
         inference_pipeline = build_inference_pipeline(
-            csv_path=config["data"]["csv_path"],
-            csv_name=config["data"]["csv_name"],
+            csv_bytes=config["data"]["csv_bytes"],
             model_path=config["model"]["save_dir"],
             model_name=config["model"]["name"],
             operational_columns=config["operational_columns"],
@@ -437,69 +495,76 @@ if __name__ == "__main__":
     run_training = True
     run_inference = False
 
+    operational_columns1 = [
+        "loan_status",
+        "person_age",
+        "person_income",
+        "person_emp_exp",
+        "loan_amnt",
+        "loan_int_rate",
+        "loan_percent_income",
+        "cb_person_cred_hist_length",
+        "credit_score",
+        "person_gender_encoded",
+        "Associate",
+        "Bachelor",
+        "Master",
+        "MORTGAGE",
+        "OTHER",
+        "OWN",
+        "RENT",
+        "DEBTCONSOLIDATION",
+        "EDUCATION",
+        "HOMEIMPROVEMENT",
+        "MEDICAL",
+        "PERSONAL",
+        "VENTURE",
+        "previous_loan_defaults_on_file_encoded",
+    ]
+
+    operational_columns2 = [
+        "person_age",
+        "person_income",
+        "person_emp_exp",
+        "loan_amnt",
+        "loan_int_rate",
+        "loan_percent_income",
+        "cb_person_cred_hist_length",
+        "credit_score",
+        "person_gender_encoded",
+        "Associate",
+        "Bachelor",
+        "Master",
+        "MORTGAGE",
+        "OTHER",
+        "OWN",
+        "RENT",
+        "DEBTCONSOLIDATION",
+        "EDUCATION",
+        "HOMEIMPROVEMENT",
+        "MEDICAL",
+        "PERSONAL",
+        "VENTURE",
+        "previous_loan_defaults_on_file_encoded",
+    ]
+
+    with open("data/loan_data.csv", "rb") as file:
+        csv_bytes = file.read()
+
     config_train = {
-        "data": {"csv_path": "data", "csv_name": "loan_data.csv"},
+        "data": {"csv_bytes": csv_bytes},
         "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
         "target_column": "loan_status",
-        "operational_columns": [
-            "loan_status",
-            "person_age",
-            "person_income",
-            "person_emp_exp",
-            "loan_amnt",
-            "loan_int_rate",
-            "loan_percent_income",
-            "cb_person_cred_hist_length",
-            "credit_score",
-            "person_gender_encoded",
-            "Associate",
-            "Bachelor",
-            "Master",
-            "MORTGAGE",
-            "OTHER",
-            "OWN",
-            "RENT",
-            "DEBTCONSOLIDATION",
-            "EDUCATION",
-            "HOMEIMPROVEMENT",
-            "MEDICAL",
-            "PERSONAL",
-            "VENTURE",
-            "previous_loan_defaults_on_file_encoded",
-        ],
+        "operational_columns": operational_columns1,
         "encoding_strategy": encoding_strategy,
         "create_model": create_rnd_forest_classifier,
         "enable_metrics": True,
     }
 
     config_inference = {
-        "data": {"csv_path": "data", "csv_name": "loan_data_copy.csv"},
+        "data": {"csv_bytes": csv_bytes},
         "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
-        "operational_columns": [
-            "person_age",
-            "person_income",
-            "person_emp_exp",
-            "loan_amnt",
-            "loan_int_rate",
-            "loan_percent_income",
-            "cb_person_cred_hist_length",
-            "credit_score",
-            "person_gender_encoded",
-            "Associate",
-            "Bachelor",
-            "Master",
-            "MORTGAGE",
-            "OTHER",
-            "OWN",
-            "RENT",
-            "DEBTCONSOLIDATION",
-            "EDUCATION",
-            "HOMEIMPROVEMENT",
-            "MEDICAL",
-            "PERSONAL",
-            "VENTURE",
-            "previous_loan_defaults_on_file_encoded",
-        ],
+        "operational_columns": operational_columns2,
         "encoding_strategy": encoding_strategy,
     }
 
