@@ -31,6 +31,7 @@ def encode_binary(df: pd.DataFrame, column: str, target_value: str) -> pd.DataFr
         pd.DataFrame: A new DataFrame with the encoded column appended.
 
     """
+    # If value is target_value, encode as 1; otherwise 0
     df_encoded = df[column].apply(
         lambda value: 1 if value.lower() == target_value else 0,
     )
@@ -40,6 +41,19 @@ def encode_binary(df: pd.DataFrame, column: str, target_value: str) -> pd.DataFr
 
 
 def encode_one_hot(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Encodes a categorical feature into one-hot encoded columns.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column (str): The name of the column to be encoded.
+
+    Returns:
+        pd.DataFrame: A new DataFrame with the one-hot encoded columns appended.
+
+    """
+    # Create a sparse matrix with N columns, each representing one unique values
+    # The encoded value is set to 1, all other are set to 0
     df_encoded = (
         pd.get_dummies(
             df[column].apply(pd.Series).stack(),
@@ -52,6 +66,20 @@ def encode_one_hot(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
 
 def encode_columns(df_sanitized: pd.DataFrame, encoding_strategy: dict) -> pd.DataFrame:
+    """
+    Applies the specified encoding strategies to a sanitized DataFrame.
+
+    Args:
+        df_sanitized (pd.DataFrame): The input DataFrame with no missing values and all columns already processed for non-numeric data types.
+        encoding_strategy (dict): A dictionary mapping column names to their respective encoding functions.\
+            Each value in the dictionary should be a callable that takes a DataFrame and a column name as arguments\
+            and returns a DataFrame containing the encoded column(s).
+
+    Returns:
+        pd.DataFrame: A new DataFrame with the specified columns removed and replaced with their encoded versions.\
+            If a column is not found in the encoding_strategy, it remains unchanged in the returned DataFrame.
+
+    """
     df_encoded = df_sanitized.copy()
 
     for column in df_encoded:

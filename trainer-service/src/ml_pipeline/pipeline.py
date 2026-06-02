@@ -11,12 +11,12 @@ from .dataframe_encoder import (
     encode_columns,
     encoding_strategy,
 )
-from .dataframe_reader import read_csv_from_bytes, read_dataframe
-from .logger import get_logger
-from .ml_utilities import (
+from .dataframe_manager import (
     balance_dateframe,
     split_data,
 )
+from .dataframe_reader import read_csv_from_bytes, read_dataframe
+from .logger import get_logger
 from .model_manager import (
     get_model_metrics,
     load_model,
@@ -25,24 +25,53 @@ from .model_manager import (
     save_model,
 )
 
-# TODO:
-#   - recive model as bytes
-
 
 class PipelineStep(ABC):
     """Base (and based) step for pipeline."""
 
-    def __init__(self, logger: object = None):
+    def __init__(self, logger: object = None) -> None:
+        """
+        Initialize the PipelineStep.
+
+        Args:
+            logger (object): The logging object to use. Defaults to None.
+                If not provided, a default logger will be used.
+
+        Attributes:
+            logger (logging.Logger): The initialized logging object.
+
+        """
         self.logger = logger
         if not logger:
             self.logger = logging.getLogger()
 
     @abstractmethod
     def execute(self, **kwargs) -> pd.DataFrame | object | None:
-        pass
+        """
+        Execute the pipeline step with given parameters.
 
-    def _handle_error(self, step_name: str, error: Exception):
-        self.logger.error(f"Step '{step_name}' yeld error: \n{error}.")
+        Args:
+            **kwargs: Additional keyword arguments for execution.
+
+        Returns:
+            Union[pd.DataFrame, object, None]: The result of the execution.
+
+        Raises:
+            NotImplementedError: If the method is not implemented in a subclass.
+
+        """
+
+    def _handle_error(self, step_name: str, error: Exception) -> None:
+        """
+        Handle errors that occur during the pipeline step's execution.
+
+        Args:
+            step_name (str): The name of the pipeline step where the error occurred.
+            error (Exception): The exception object raised during execution.
+
+        """
+        msg = f"Step '{step_name}' yielded error: \n{error}."
+        self.logger.error(msg)
 
 
 class LoadDataCSVStep(PipelineStep):
