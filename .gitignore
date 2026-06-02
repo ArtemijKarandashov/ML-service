@@ -3,7 +3,6 @@ uploads/
 storedfiles.db
 data/
 logs/
-*debugging.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -209,6 +208,7 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 .vscode
+.continue
 tempCodeRunnerFile.py
 
 # Ruff stuff:
