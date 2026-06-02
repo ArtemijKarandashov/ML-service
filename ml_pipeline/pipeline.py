@@ -3,13 +3,17 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import pandas as pd
-from create_models import create_logistic_regression_model, create_rnd_forest_classifier
-from dataframe_encoder import (
+
+from .create_models import (
+    create_logistic_regression_model,
+    create_rnd_forest_classifier,
+)
+from .dataframe_encoder import (
     encode_columns,
     encoding_strategy,
 )
-from dataframe_reader import read_csv_from_bytes, read_dataframe
-from ml_utilities import (
+from .dataframe_reader import read_csv_from_bytes, read_dataframe
+from .ml_utilities import (
     balance_dateframe,
     get_model_metrics,
     load_model,
