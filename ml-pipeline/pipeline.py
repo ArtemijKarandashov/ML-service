@@ -431,14 +431,14 @@ def run_training_pipeline(config: dict, context: dict):
         return result
 
 
-def build_inference_pipeline(
+def build_prediction_pipeline(
     csv_bytes: bytes,
     model_path: str,
     model_name: str,
     operational_columns: list,
     encoding_strategy: dict,
 ):
-    """Fabric function to build a inference pipeline."""
+    """Fabric function to build a prediction pipeline."""
     # predictor pipeline:
     # get pd.DataFrame
     # prepare data for the model
@@ -463,13 +463,13 @@ def build_inference_pipeline(
     return pipeline
 
 
-def run_inference_pipeline(config: dict, context: dict):
+def run_prediction_pipeline(config: dict, context: dict):
     """Запуск процесса предсказания."""
-    logger = setup_logger("ml_inference.log")
-    logger.info("Starting run_inference_pipeline...")
+    logger = setup_logger("ml_prediction.log")
+    logger.info("Starting run_prediction_pipeline...")
 
     try:
-        inference_pipeline = build_inference_pipeline(
+        prediction_pipeline = build_prediction_pipeline(
             csv_bytes=config["data"]["csv_bytes"],
             model_path=config["model"]["save_dir"],
             model_name=config["model"]["name"],
@@ -477,14 +477,14 @@ def run_inference_pipeline(config: dict, context: dict):
             encoding_strategy=config["encoding_strategy"],
         )
 
-        prediction = inference_pipeline.run(context)
+        prediction = prediction_pipeline.run(context)
 
     except Exception as e:
-        logger.exception(f"Error in run_inference_pipeline: {e}")
+        logger.exception(f"Error in run_prediction_pipeline: {e}")
         return None
 
     else:
-        logger.info("Inference pipeline completed successfully.")
+        logger.info("prediction pipeline completed successfully.")
         return {"status": prediction["status"], "prediction": prediction["prediction"]}
 
 
@@ -493,7 +493,7 @@ def run_inference_pipeline(config: dict, context: dict):
 if __name__ == "__main__":
     pretty_printing = True
     run_training = True
-    run_inference = False
+    run_prediction = True
 
     operational_columns1 = [
         "loan_status",
@@ -561,7 +561,7 @@ if __name__ == "__main__":
         "enable_metrics": True,
     }
 
-    config_inference = {
+    config_prediction = {
         "data": {"csv_bytes": csv_bytes},
         "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
         "operational_columns": operational_columns2,
@@ -584,12 +584,12 @@ if __name__ == "__main__":
         else:
             print("Обучение завершено с ошибками (см. лог).")
 
-    if run_inference:
+    if run_prediction:
         if pretty_printing:
             print("\n" + "=" * 50)
             print("ЗАПУСК ИНФЕРЕНСА")
             print("=" * 50)
 
         context: dict = {}
-        result_infer = run_inference_pipeline(config_inference, context)
+        result_infer = run_prediction_pipeline(config_prediction, context)
         print(f"results: ", result_infer)
