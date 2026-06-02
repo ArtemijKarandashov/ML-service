@@ -1,13 +1,4 @@
-import pickle
-from typing import Any
-
-import numpy as np
 import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    roc_auc_score,
-)
 from sklearn.model_selection import train_test_split
 
 
@@ -20,41 +11,6 @@ def split_data(df, target_column: str, test_size: float = 0.1) -> tuple:
     )
 
     return x_train, x_test, y_train, y_test
-
-
-def get_model_metrics(
-    model: Any,
-    x_test: pd.DataFrame,
-    y_test: pd.Series,
-) -> dict[str, float, np.ndarray]:
-    test_prediction = model.predict(x_test)
-    metrics = {
-        "accuracy": accuracy_score(y_test, test_prediction),
-        "roc_auc": roc_auc_score(y_test, test_prediction),
-        "confusion_matrix": confusion_matrix(y_test, test_prediction),
-    }
-
-    return metrics
-
-
-def save_model(model: Any, path: str, model_name: str) -> None:
-    with open(path + "/" + model_name, "wb") as file:
-        pickle.dump(model, file)
-        print(f"type of model: {type(model)}")
-        print(f"Model {model_name} saved to {path}")
-
-
-def load_model(path: str, model_name: str):
-    with open(path + "/" + model_name, "rb") as file:
-        loaded_model = pickle.load(file)
-
-    return loaded_model
-
-
-def predict_with_model(model: Any, data: pd.DataFrame) -> np.ndarray:
-    prediction = model.predict(data)
-
-    return prediction
 
 
 def balance_dateframe(

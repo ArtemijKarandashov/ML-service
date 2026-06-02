@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
 
 import pandas as pd
 
@@ -13,69 +12,52 @@ from .dataframe_encoder import (
     encoding_strategy,
 )
 from .dataframe_reader import read_csv_from_bytes, read_dataframe
+from .logger import get_logger
 from .ml_utilities import (
     balance_dateframe,
-    get_model_metrics,
-    load_model,
-    predict_with_model,
-    save_model,
     split_data,
 )
+from .model_manager import (
+    get_model_metrics,
+    load_model,
+    load_model_from_bytes,
+    predict_with_model,
+    save_model,
+)
 
-
-def setup_logger(
-    file_path: str = "logs",
-    file_name: str = "ml_pipeline.log",
-    level: int = logging.INFO,
-):
-    logger = logging.getLogger(__name__)
-    logger.setLevel(level)
-
-    filename = Path().joinpath(file_path, file_name)
-
-    Path(file_path).mkdir(parents=True, exist_ok=True)
-    Path(filename).touch(exist_ok=True)
-
-    if filename is None:
-        return logger
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    # Консольный вывод (надо?)
-    # console_handler = logging.StreamHandler()
-    # console_handler.setLevel(logging.INFO)
-    # console_handler.setFormatter(formatter)
-    # logger.addHandler(console_handler)
-
-    file_handler = logging.FileHandler(filename, mode="w")
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    return logger
+# TODO:
+#   - recive model as bytes
 
 
 class PipelineStep(ABC):
     """Base (and based) step for pipeline."""
+
+    def __init__(self, logger: object = None):
+        self.logger = logger
+        if not logger:
+            self.logger = logging.getLogger()
 
     @abstractmethod
     def execute(self, **kwargs) -> pd.DataFrame | object | None:
         pass
 
     def _handle_error(self, step_name: str, error: Exception):
-        logging.error(f"Step '{step_name}' yeld error: \n{error}.")
+        self.logger.error(f"Step '{step_name}' yeld error: \n{error}.")
 
 
 class LoadDataCSVStep(PipelineStep):
-    def __init__(self, csv_path: str, csv_name: str):
+    def __init__(
+        self,
+        csv_path: str,
+        csv_name: str,
+    ):
         self.csv_path = csv_path
         self.csv_name = csv_name
+        super().__init__()
 
     def execute(self, context: dict) -> pd.DataFrame | None:
         try:
-            logging.info(f"Loading data from {self.csv_path}/{self.csv_name}")
+            self.logger.info(f"Loading data from {self.csv_path}/{self.csv_name}")
             df = read_dataframe(self.csv_path, self.csv_name)
 
             if df.empty:
@@ -94,10 +76,11 @@ class LoadDataCSVStep(PipelineStep):
 class LoadDataBytesStep(PipelineStep):
     def __init__(self, csv_bytes: bytes):
         self.csv_bytes = csv_bytes
+        super().__init__()
 
     def execute(self, context: dict) -> pd.DataFrame | None:
         try:
-            logging.info(f"Loading data from bytes")
+            self.logger.info(f"Loading data from bytes")
             df = read_csv_from_bytes(self.csv_bytes)
 
             if df.empty:
@@ -116,12 +99,13 @@ class LoadDataBytesStep(PipelineStep):
 class EncodeDataStep(PipelineStep):
     def __init__(self, encoding_strategy: dict[str, callable]):
         self.encoding_strategy = encoding_strategy
+        super().__init__()
 
     def execute(self, context: dict) -> pd.DataFrame | None:
         try:
             df_loaded = context["df_loaded"].copy()
 
-            logging.info("Statring data encoding...")
+            self.logger.info("Statring data encoding...")
             df_encoded = encode_columns(df_loaded, self.encoding_strategy)
 
             context["df_encoded"] = df_encoded
@@ -138,12 +122,13 @@ class EncodeDataStep(PipelineStep):
 class CleanDataStep(PipelineStep):
     def __init__(self, operational_columns: list):
         self.operational_columns = operational_columns
+        super().__init__()
 
     def execute(self, context: dict) -> pd.DataFrame | None:
         try:
             df_encoded = context["df_encoded"].copy()
 
-            logging.info("Deleting columns with low correlation...")
+            self.logger.info("Deleting columns with low correlation...")
             df_clean = df_encoded.drop(
                 df_encoded.columns.difference(self.operational_columns),
                 axis=1,
@@ -164,12 +149,13 @@ class BalanceDataStep(PipelineStep):
     def __init__(self, target_column: str, cutout_threshold: float = 0.7):
         self.target_column = target_column
         self.cutout_threshold = cutout_threshold
+        super().__init__()
 
     def execute(self, context: dict) -> dict:
         try:
             df_clean = context["df_clean"].copy()
 
-            logging.info("Balancing dataframe")
+            self.logger.info("Balancing dataframe")
             df_clean = balance_dateframe(
                 df_clean,
                 self.target_column,
@@ -196,12 +182,13 @@ class SplitDataStep(PipelineStep):
         self.target_column = target_column
         self.test_size = test_size
         self.random_state = random_state
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
             df_clean = context["df_clean"]
 
-            logging.info(f"Splitting data (test size: {self.test_size}%).")
+            self.logger.info(f"Splitting data (test size: {self.test_size}%).")
             x_train, x_test, y_train, y_test = split_data(
                 df_clean,
                 target_column=self.target_column,
@@ -228,13 +215,14 @@ class TrainModelStep(PipelineStep):
         self.create_model = create_model
         self.random_state = random_state
         self.n_jobs = n_jobs
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
             x_train = context["x_train"]
             y_train = context["y_train"]
 
-            logging.info("Training model...")
+            self.logger.info("Training model...")
             trained_model = self.create_model(
                 x_train,
                 y_train,
@@ -254,14 +242,14 @@ class TrainModelStep(PipelineStep):
 
 class EvaluateMetricsStep(PipelineStep):
     def __init__(self):
-        pass
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
             x_test, y_test = context["x_test"], context["y_test"]
 
-            logging.info("Evaluate model metrics...")
+            self.logger.info("Evaluate model metrics...")
             metrics = get_model_metrics(trained_model, x_test, y_test)
             # returns dict:
             #   - accuracy_score,
@@ -282,11 +270,12 @@ class SaveModelStep(PipelineStep):
     def __init__(self, save_dir: str, model_name: str):
         self.save_dir = save_dir
         self.model_name = model_name
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
-            logging.info(f"Сохранение модели в {self.save_dir}/{self.model_name}")
+            self.logger.info(f"Сохранение модели в {self.save_dir}/{self.model_name}")
             save_model(trained_model, self.save_dir, self.model_name)
 
             context["model_saved"] = True
@@ -303,10 +292,11 @@ class LoadModelStep(PipelineStep):
     def __init__(self, model_path: str, model_name: str):
         self.model_path = model_path
         self.model_name = model_name
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
-            logging.info(f"Loading model from {self.model_path}/{self}")
+            self.logger.info(f"Loading model from {self.model_path}/{self}")
             trained_model = load_model(self.model_path, self.model_name)
 
             context["trained_model"] = trained_model
@@ -319,9 +309,29 @@ class LoadModelStep(PipelineStep):
             return context
 
 
+class LoadModelBytesStep(PipelineStep):
+    def __init__(self, model_bytes: bytes):
+        self.model_bytes = model_bytes
+        super().__init__()
+
+    def execute(self, context: dict) -> dict | None:
+        try:
+            self.logger.info(f"Loading model from bytes")
+            trained_model = load_model_from_bytes(self.model_bytes)
+
+            context["trained_model"] = trained_model
+
+        except Exception as e:
+            self._handle_error("LoadModelBytes", e)
+            return None
+
+        else:
+            return context
+
+
 class PredictionStep(PipelineStep):
     def __init__(self):
-        pass
+        super().__init__()
 
     def execute(self, context: dict) -> dict | None:
         try:
@@ -402,13 +412,12 @@ def build_training_pipeline(
 
 def run_training_pipeline(config: dict, context: dict):
     """Wrapper for config based pipeline."""
-    logger = setup_logger()
+    logger = get_logger()
     logger.info("Starting model training pipeline...")
 
     try:
         training_pipeline = build_training_pipeline(
             csv_bytes=config["data"]["csv_bytes"],
-            # csv_name=config["data"]["csv_name"],
             model_name=config["model"]["name"],
             save_dir=config["model"]["save_dir"],
             encoding_strategy=config["encoding_strategy"],
@@ -435,8 +444,9 @@ def run_training_pipeline(config: dict, context: dict):
 
 def build_prediction_pipeline(
     csv_bytes: bytes,
-    model_path: str,
-    model_name: str,
+    model_bytes: object,
+    # model_path: str,
+    # model_name: str,
     operational_columns: list,
     encoding_strategy: dict,
 ):
@@ -457,7 +467,7 @@ def build_prediction_pipeline(
             LoadDataBytesStep(csv_bytes),
             EncodeDataStep(encoding_strategy=encoding_strategy),
             CleanDataStep(operational_columns=operational_columns),
-            LoadModelStep(model_path=model_path, model_name=model_name),
+            LoadModelBytesStep(model_bytes=model_bytes),
             PredictionStep(),
         ],
     )
@@ -467,14 +477,13 @@ def build_prediction_pipeline(
 
 def run_prediction_pipeline(config: dict, context: dict):
     """Запуск процесса предсказания."""
-    logger = setup_logger("ml_prediction.log")
+    logger = get_logger()
     logger.info("Starting run_prediction_pipeline...")
 
     try:
         prediction_pipeline = build_prediction_pipeline(
             csv_bytes=config["data"]["csv_bytes"],
-            model_path=config["model"]["save_dir"],
-            model_name=config["model"]["name"],
+            model_bytes=config["model"]["model_bytes"],
             operational_columns=config["operational_columns"],
             encoding_strategy=config["encoding_strategy"],
         )
@@ -488,110 +497,3 @@ def run_prediction_pipeline(config: dict, context: dict):
     else:
         logger.info("prediction pipeline completed successfully.")
         return {"status": prediction["status"], "prediction": prediction["prediction"]}
-
-
-# --- Demo ---
-
-if __name__ == "__main__":
-    pretty_printing = True
-    run_training = True
-    run_prediction = True
-
-    operational_columns1 = [
-        "loan_status",
-        "person_age",
-        "person_income",
-        "person_emp_exp",
-        "loan_amnt",
-        "loan_int_rate",
-        "loan_percent_income",
-        "cb_person_cred_hist_length",
-        "credit_score",
-        "person_gender_encoded",
-        "Associate",
-        "Bachelor",
-        "Master",
-        "MORTGAGE",
-        "OTHER",
-        "OWN",
-        "RENT",
-        "DEBTCONSOLIDATION",
-        "EDUCATION",
-        "HOMEIMPROVEMENT",
-        "MEDICAL",
-        "PERSONAL",
-        "VENTURE",
-        "previous_loan_defaults_on_file_encoded",
-    ]
-
-    operational_columns2 = [
-        "person_age",
-        "person_income",
-        "person_emp_exp",
-        "loan_amnt",
-        "loan_int_rate",
-        "loan_percent_income",
-        "cb_person_cred_hist_length",
-        "credit_score",
-        "person_gender_encoded",
-        "Associate",
-        "Bachelor",
-        "Master",
-        "MORTGAGE",
-        "OTHER",
-        "OWN",
-        "RENT",
-        "DEBTCONSOLIDATION",
-        "EDUCATION",
-        "HOMEIMPROVEMENT",
-        "MEDICAL",
-        "PERSONAL",
-        "VENTURE",
-        "previous_loan_defaults_on_file_encoded",
-    ]
-
-    with open("data/loan_data.csv", "rb") as file:
-        csv_bytes = file.read()
-
-    config_train = {
-        "data": {"csv_bytes": csv_bytes},
-        "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
-        "target_column": "loan_status",
-        "operational_columns": operational_columns1,
-        "encoding_strategy": encoding_strategy,
-        "create_model": create_rnd_forest_classifier,
-        "enable_metrics": True,
-    }
-
-    config_prediction = {
-        "data": {"csv_bytes": csv_bytes},
-        "model": {"save_dir": "models", "name": "rnd_forest_classifier.pkl"},
-        "operational_columns": operational_columns2,
-        "encoding_strategy": encoding_strategy,
-    }
-
-    if run_training:
-        if pretty_printing:
-            print("=" * 50)
-            print("ЗАПУСК ОБУЧЕНИЯ")
-            print("=" * 50)
-
-        context: dict = {}
-        result_train = run_training_pipeline(config_train, context)
-
-        if result_train:
-            print("Модель успешно обучена и сохранена.")
-            if config_train["enable_metrics"]:
-                print(f"model metrics:", result_train["metrics"])
-        else:
-            print("Обучение завершено с ошибками (см. лог).")
-
-    if run_prediction:
-        if pretty_printing:
-            print("\n" + "=" * 50)
-            print("ЗАПУСК ИНФЕРЕНСА")
-            print("=" * 50)
-
-        context: dict = {}
-        result_infer = run_prediction_pipeline(config_prediction, context)
-        print(f"results: ", result_infer)
