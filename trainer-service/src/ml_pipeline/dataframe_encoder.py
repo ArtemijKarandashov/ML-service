@@ -1,5 +1,59 @@
 import pandas as pd
 
+training_allowed_columns = [
+    "loan_status",
+    "person_age",
+    "person_income",
+    "person_emp_exp",
+    "loan_amnt",
+    "loan_int_rate",
+    "loan_percent_income",
+    "cb_person_cred_hist_length",
+    "credit_score",
+    "person_gender_encoded",
+    "Associate",
+    "Bachelor",
+    "Master",
+    "MORTGAGE",
+    "OTHER",
+    "OWN",
+    "RENT",
+    "DEBTCONSOLIDATION",
+    "EDUCATION",
+    "HOMEIMPROVEMENT",
+    "MEDICAL",
+    "PERSONAL",
+    "VENTURE",
+    "previous_loan_defaults_on_file_encoded",
+]
+
+prediction_allowed_columns = [
+    "person_age",
+    "person_income",
+    "person_emp_exp",
+    "loan_amnt",
+    "loan_int_rate",
+    "loan_percent_income",
+    "cb_person_cred_hist_length",
+    "credit_score",
+    "person_gender_encoded",
+    "Associate",
+    "Bachelor",
+    "Master",
+    "MORTGAGE",
+    "OTHER",
+    "OWN",
+    "RENT",
+    "DEBTCONSOLIDATION",
+    "EDUCATION",
+    "HOMEIMPROVEMENT",
+    "MEDICAL",
+    "PERSONAL",
+    "VENTURE",
+    "previous_loan_defaults_on_file_encoded",
+]
+
+
 # Dictionary with the encoding strategies for categorical features
 encoding_strategy = {
     "person_gender": lambda df, column: encode_binary(

@@ -28,6 +28,25 @@ def save_model(model: object, path: str, model_name: str) -> None:
         print(f"Model {model_name} saved to {path}")
 
 
+def save_model_bytes(model: object) -> bytes:
+    """
+    Save a machine learning model to bytes format.
+
+    Args:
+        model (object): The machine learning model to serialize.
+
+    Returns:
+        bytes: The serialized machine learning model in bytes format.
+
+    Raises:
+        PickleError: If the model cannot be serialized due to unsupported types.
+
+    """
+    model_bytes = pickle.dump(model)
+
+    return model_bytes
+
+
 def load_model(path: str, model_name: str) -> object:
     """
     Load a model from disk.
