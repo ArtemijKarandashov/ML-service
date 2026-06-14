@@ -37,8 +37,8 @@ services:
     expose:
       - "80"
     environment:
-      - VIRTUAL_HOST=mes-db.knuckles.us
-      - LETSENCRYPT_HOST=mes-db.knuckles.us
+      - VIRTUAL_HOST=smth.ru
+      - LETSENCRYPT_HOST=smth.ru
     restart: always
 
   client-service:
