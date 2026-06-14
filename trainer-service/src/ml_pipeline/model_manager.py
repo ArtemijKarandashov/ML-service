@@ -42,7 +42,7 @@ def save_model_bytes(model: object) -> bytes:
         PickleError: If the model cannot be serialized due to unsupported types.
 
     """
-    model_bytes = pickle.dump(model)
+    model_bytes = pickle.dumps(model)
 
     return model_bytes
 

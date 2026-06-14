@@ -1,25 +1,16 @@
 import logging
 from abc import ABC, abstractmethod
 
-import numpy as np
 import pandas as pd
 
-from .create_models import (
-    create_logistic_regression_model,
-    create_rnd_forest_classifier,
-)
 from .dataframe_encoder import (
     encode_columns,
-    encoding_strategy,
-    prediction_allowed_columns,
-    training_allowed_columns,
 )
 from .dataframe_manager import (
     balance_dateframe,
     split_data,
 )
 from .dataframe_reader import read_csv_from_bytes, read_dataframe
-from .logger import get_logger
 from .model_manager import (
     get_model_metrics,
     load_model,
@@ -42,7 +33,7 @@ class PipelineStep(ABC):
                 If not provided, a default logger will be used.
 
         Attributes:
-            logger (logging.Logger): The initialized logging object.
+            logger (logging): The initialized logging object.
 
         """
         self.logger = logger
@@ -113,7 +104,7 @@ class LoadDataBytesStep(PipelineStep):
 
     def execute(self, context: dict) -> pd.DataFrame | None:
         try:
-            self.logger.info(f"Loading data from bytes")
+            self.logger.info("Loading data from bytes")
             df = read_csv_from_bytes(self.csv_bytes)
 
             if df.empty:
@@ -244,8 +235,8 @@ class SplitDataStep(PipelineStep):
 
 
 class TrainModelStep(PipelineStep):
-    def __init__(self, create_model: callable, random_state: int = 0, n_jobs: int = -1):
-        self.create_model = create_model
+    def __init__(self, model_func: callable, random_state: int = 0, n_jobs: int = -1):
+        self.model_func = model_func
         self.random_state = random_state
         self.n_jobs = n_jobs
         super().__init__()
@@ -256,7 +247,7 @@ class TrainModelStep(PipelineStep):
             y_train = context["y_train"]
 
             self.logger.info("Training model...")
-            trained_model = self.create_model(
+            trained_model = self.model_func(
                 x_train,
                 y_train,
                 self.random_state,
@@ -308,7 +299,7 @@ class SaveModelStep(PipelineStep):
     def execute(self, context: dict) -> dict | None:
         try:
             trained_model = context["trained_model"]
-            self.logger.info(f"Сохранение модели в {self.save_dir}/{self.model_name}")
+            self.logger.info(f"Saving model to {self.save_dir}/{self.model_name}")
             save_model(trained_model, self.save_dir, self.model_name)
 
             context["model_saved"] = True
@@ -369,7 +360,7 @@ class LoadModelBytesStep(PipelineStep):
 
     def execute(self, context: dict) -> dict | None:
         try:
-            self.logger.info(f"Loading model from bytes")
+            self.logger.info("Loading model from bytes")
             trained_model = load_model_from_bytes(self.model_bytes)
 
             context["trained_model"] = trained_model
@@ -407,152 +398,11 @@ class StrategyPipeline:
     def __init__(self, steps: list[PipelineStep]):
         self.steps = steps
 
-    def run(self, context) -> dict:
+    def run(self, context, *, print_context: bool = False) -> dict:
         for step in self.steps:
             context = step.execute(context)
-            # print("Context: ", context)
-            # try:
-            #     print("Context: ", context["df_clean"].info())
-            # except Exception:
-            #     pass
+
+            if print_context:
+                print("Context: ", context)
+
         return context
-
-
-def build_training_pipeline(
-    csv_bytes: bytes,  # resieved from controller
-    enable_metrics: bool = True,
-    allowed_columns: list = training_allowed_columns,
-    encoding_strategy: dict = encoding_strategy,
-    target_column: str = "loan_status",
-    create_model: callable = create_rnd_forest_classifier,
-) -> dict("model_bytes"):
-    """Fabric function to build a training pipeline."""
-    # learner pipeline:
-    # get DataFrame
-    # prepate DataFrame:
-    #   - encode categorical features
-    #   - delete unnecessary columns
-    #   TODO:
-    #   - if columns contains NaN values, fill them with mean value of column
-    #   - if columns contains non numeric values throw an error
-    # split into train and test set
-    # create model
-    # train model
-    # optional:
-    #   - evaluate metrics on train and test set
-    # save model
-
-    pipeline = StrategyPipeline(
-        [
-            LoadDataBytesStep(csv_bytes=csv_bytes),
-            EncodeDataStep(encoding_strategy=encoding_strategy),
-            CleanDataStep(allowed_columns=allowed_columns),
-            BalanceDataStep(target_column=target_column),
-            SplitDataStep(target_column=target_column, test_size=0.1),
-            TrainModelStep(create_model=create_model),
-            EvaluateMetricsStep() if enable_metrics else None,
-            # SaveModelStep(save_dir=save_dir, model_name=model_name),
-            SaveBytesModel(),
-        ],
-    )
-
-    return pipeline
-
-
-def run_training_pipeline(
-    config: dict("csv_bytes"),
-    logger: object,
-    context: dict,
-) -> dict("model_bytes", "metrics"):
-    """Wrapper for config based pipeline."""
-    if logger is None:
-        logger = get_logger()
-    logger.info("Starting model training pipeline...")
-
-    # if context is not dict or not defined
-    if isinstance(context, dict):
-        context = {}
-
-    try:
-        training_pipeline = build_training_pipeline(
-            csv_bytes=config["csv_bytes"],
-            # model_name=config["model"]["name"],
-            # save_dir=config["model"]["save_dir"],
-            # encoding_strategy=config["encoding_strategy"],
-            # allowed_columns=config["allowed_columns"],
-            # target_column=config["target_column"],
-            # enable_metrics=config["enable_metrics"],
-            # create_model=config["create_model"],
-        )
-
-        logger.info("Executing pipeline...")
-
-        result = training_pipeline.run(context)
-
-        if result["model_saved"]:
-            logger.info("Pipeline seccessfully executed")
-
-    except Exception as e:
-        logger.exception(f"Error during pipeline execution. Error: {e}")
-        return None
-
-    else:
-        return result
-
-
-def build_prediction_pipeline(
-    csv_bytes: bytes,  # resieved from controller
-    model_bytes: object,  # resieved from controller
-    encoding_strategy: dict = encoding_strategy,
-    allowed_columns: list = prediction_allowed_columns,
-):
-    """Fabric function to build a prediction pipeline."""
-    # predictor pipeline:
-    # get pd.DataFrame
-    # prepare data for the model
-    #   - encode categorical features
-    #   - delete unnecessary columns
-    #   TODO:
-    #   - if columns contains NaN values, fill them
-    #   - if columns contains non numeric values throw an error
-    # load model
-    # predict with model
-
-    pipeline = StrategyPipeline(
-        [
-            LoadDataBytesStep(csv_bytes=csv_bytes),
-            EncodeDataStep(encoding_strategy=encoding_strategy),
-            CleanDataStep(allowed_columns=allowed_columns),
-            LoadModelBytesStep(model_bytes=model_bytes),
-            PredictionStep(),
-        ],
-    )
-
-    return pipeline
-
-
-def run_prediction_pipeline(
-    config: dict("csv_bytes", "model_bytes"),
-    context: dict,
-) -> np.array:
-    """Запуск процесса предсказания."""
-    logger = get_logger()
-    logger.info("Starting run_prediction_pipeline...")
-
-    try:
-        prediction_pipeline = build_prediction_pipeline(
-            csv_bytes=config["csv_bytes"],
-            model_bytes=config["model_bytes"],
-            # allowed_columns=config["allowed_columns"],
-            # encoding_strategy=config["encoding_strategy"],
-        )
-
-        prediction = prediction_pipeline.run(context)
-
-    except Exception as e:
-        logger.exception(f"Error in run_prediction_pipeline: {e}")
-        return None
-
-    else:
-        logger.info("prediction pipeline completed successfully.")
-        return prediction["prediction"]
