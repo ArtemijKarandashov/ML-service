@@ -585,43 +585,6 @@
             }
         }
         
-        // === ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ===
-        function renderResults(results, model, source) {
-            const responseDiv = document.getElementById('responseText');
-            let result = ` Модель: ${model.name}\n`;
-            result += ` UID: ${model.uid}\n`;
-            result += ` Источник: ${source}\n`;
-            result += ` Количество записей: ${results.length}\n`;
-            result += "═".repeat(65) + "\n\n";
-            
-            results.forEach((client, index) => {
-                result += ` Клиент #${index + 1}:\n`;
-                result += `   Возраст: ${client.person_age}\n`;
-                result += `   Пол: ${client.person_gender === 'female' ? 'Женский' : 'Мужской'}\n`;
-                result += `   Образование: ${client.person_education}\n`;
-                result += `   Доход: ${client.person_income.toLocaleString()} ₽\n`;
-                result += `   Стаж: ${client.person_emp_exp} мес.\n`;
-                result += `   Жилье: ${client.person_home_ownership}\n`;
-                result += `   Сумма кредита: ${client.loan_amnt.toLocaleString()} ₽\n`;
-                result += `   Цель: ${client.loan_intent}\n`;
-                result += `   Ставка: ${client.loan_int_rate}%\n`;
-                result += `   Доля дохода: ${(client.loan_percent_income * 100).toFixed(1)}%\n`;
-                result += `   Ист. кредита: ${client.cb_person_cred_hist_length} мес.\n`;
-                result += `   Кред. рейтинг: ${client.credit_score}\n`;
-                result += `   Просрочки: ${client.previous_loan_defaults_on_file === 'Yes' ? 'Были' : 'Нет'}\n`;
-                result += `   Скоринг: ${client.score}%\n`;
-                result += `   Решение: ${client.approval} (вероятность: ${client.probability})\n`;
-                result += "─".repeat(50) + "\n";
-            });
-            
-            // Статистика
-            const approved = results.filter(r => r.approval === 'ОДОБРЕНО').length;
-            result += `\n Итоговая статистика:\n`;
-            result += `  Одобрено: ${approved} из ${results.length} (${(approved/results.length*100).toFixed(1)}%)\n`;
-            result += `  Отказано: ${results.length - approved} из ${results.length} (${((results.length-approved)/results.length*100).toFixed(1)}%)\n`;
-            
-            responseDiv.innerHTML = result;
-        }
         
         // === ЗАГРУЗКА И ОБРАБОТКА CSV ===
         async function uploadCSV() {
