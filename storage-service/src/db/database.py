@@ -2,6 +2,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import text
 
 from src.config import Config
 
@@ -27,3 +28,15 @@ async def get_session() -> AsyncSession: # type: ignore
 
     async with Session() as session:
         yield session
+
+
+async def check_database_health() -> bool:
+    """
+    Проверяет работоспособность БД, выполняя запрос SELECT 1.
+    """
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False

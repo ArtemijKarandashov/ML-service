@@ -6,6 +6,8 @@
 </head>
 <body>
     <h1>Jinja2 test page</h1>
+
+    <!-- ===================== БЛОК ЗАГРУЗКИ МОДЕЛИ ===================== -->
     <h1>Загрузка файла</h1>
     <form method="post" enctype="multipart/form-data" action="/api/v1/trainer/upload-model">
         <label for="file">Выберите файл:</label>
@@ -18,23 +20,64 @@
         <hr>
         <p>Файл <strong>{{ filename }}</strong> успешно загружен!</p>
     {% endif %}
+
+    <!-- ===================== БЛОК ОПЕРАЦИЙ С МОДЕЛЬЮ ===================== -->
     <div>
         <label for="uid">UID файла:</label>
         <input type="text" id="uid" placeholder="Введите uid" style="width: 300px;">
     </div>
-
     <br>
 
-    <!-- Кнопка для удаления (DELETE) -->
     <button onclick="deleteFile()">Удалить файл</button>
-
-    <!-- Кнопка для скачивания (GET) -->
     <button onclick="downloadFile()">Скачать файл</button>
 
-    <!-- Блок для отображения результата удаления -->
     <hr>
     <div id="result" style="font-family: monospace; white-space: pre-wrap;"></div>
+
+    <!-- ===================== НОВЫЙ БЛОК: ОБУЧЕНИЕ ===================== -->
+    <hr>
+    <h1>Обучение модели (train)</h1>
+    <form id="trainForm" enctype="multipart/form-data">
+        <label for="trainCsv">CSV файл для обучения:</label>
+        <input type="file" name="csv_file" id="trainCsv" accept=".csv" required>
+        <br><br>
+        <button type="submit">Обучить</button>
+    </form>
+    <div id="trainResult" style="font-family: monospace; white-space: pre-wrap;"></div>
+
+    <!-- ===================== НОВЫЙ БЛОК: ПРЕДСКАЗАНИЕ ПО JSON ===================== -->
+    <hr>
+    <h1>Предсказание по JSON (predict)</h1>
+    <div>
+        <label for="predictUid">UID модели:</label>
+        <input type="text" id="predictUid" placeholder="Введите uid" style="width: 300px;">
+    </div>
+    <div>
+        <label for="jsonData">Данные (JSON-массив объектов):</label><br>
+        <textarea id="jsonData" rows="6" cols="60" placeholder='[{"person_age": 25, ...}, ...]' style="font-family: monospace;"></textarea>
+    </div>
+    <br>
+    <button onclick="predictJson()">Отправить</button>
+    <div id="predictJsonResult" style="font-family: monospace; white-space: pre-wrap;"></div>
+
+    <!-- ===================== НОВЫЙ БЛОК: ПРЕДСКАЗАНИЕ ПО CSV ===================== -->
+    <hr>
+    <h1>Предсказание по CSV (predict_csv)</h1>
+    <div>
+        <label for="predictCsvUid">UID модели:</label>
+        <input type="text" id="predictCsvUid" placeholder="Введите uid" style="width: 300px;">
+    </div>
+    <form id="predictCsvForm" enctype="multipart/form-data">
+        <label for="predictCsvFile">CSV файл для предсказания:</label>
+        <input type="file" name="csv_file" id="predictCsvFile" accept=".csv" required>
+        <br><br>
+        <button type="submit">Отправить</button>
+    </form>
+    <div id="predictCsvResult" style="font-family: monospace; white-space: pre-wrap;"></div>
+
+    <!-- ===================== СКРИПТЫ ===================== -->
     <script>
+        // ---------- Существующие функции ----------
         async function deleteFile() {
             const uid = document.getElementById('uid').value.trim();
             const resultDiv = document.getElementById('result');
@@ -42,16 +85,13 @@
                 resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
                 return;
             }
-
             resultDiv.innerHTML = 'Удаление...';
-
             try {
                 const response = await fetch(`/api/v1/trainer/delete-model/${uid}`, {
                     method: 'DELETE'
                 });
-
                 if (response.ok) {
-                    const data = await response.json(); // {message, uid}
+                    const data = await response.json();
                     resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message} (uid: ${data.uid})</span>`;
                 } else {
                     let errorText = await response.text();
@@ -68,9 +108,114 @@
                 alert('Введите uid');
                 return;
             }
-            // Просто перенаправляем браузер на URL скачивания
             window.location.href = `/api/v1/trainer/get-model/${uid}`;
         }
+
+        // ---------- НОВАЯ ФУНКЦИЯ: ОБУЧЕНИЕ ----------
+        document.getElementById('trainForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const resultDiv = document.getElementById('trainResult');
+            resultDiv.innerHTML = 'Отправка...';
+
+            try {
+                const response = await fetch('http://localhost:8082/api/v1/trainer/train', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>UID: ${data.uid}</span>`;
+                } else {
+                    let errorText = await response.text();
+                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+            }
+        });
+
+        // ---------- НОВАЯ ФУНКЦИЯ: ПРЕДСКАЗАНИЕ ПО JSON (исправлено) ----------
+        async function predictJson() {
+            const uid = document.getElementById('predictUid').value.trim();
+            const jsonText = document.getElementById('jsonData').value.trim();
+            const resultDiv = document.getElementById('predictJsonResult');
+
+            if (!uid) {
+                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
+                return;
+            }
+            if (!jsonText) {
+                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите JSON-данные</span>';
+                return;
+            }
+
+            let jsonData;
+            try {
+                jsonData = JSON.parse(jsonText);
+                if (!Array.isArray(jsonData)) {
+                    throw new Error('Данные должны быть массивом объектов');
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка в JSON: ${e.message}</span>`;
+                return;
+            }
+
+            // Формируем тело с полем "data"
+            const payload = { data: jsonData };
+
+            resultDiv.innerHTML = 'Отправка...';
+            try {
+                const response = await fetch(`http://localhost:8082/api/v1/predictor/predict/${uid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>Предсказание: ${JSON.stringify(data.predicion, null, 2)}</span>`;
+                } else {
+                    let errorText = await response.text();
+                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+            }
+        }
+
+        // ---------- НОВАЯ ФУНКЦИЯ: ПРЕДСКАЗАНИЕ ПО CSV ----------
+        document.getElementById('predictCsvForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const uid = document.getElementById('predictCsvUid').value.trim();
+            const resultDiv = document.getElementById('predictCsvResult');
+
+            if (!uid) {
+                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
+                return;
+            }
+
+            const formData = new FormData(this);
+            resultDiv.innerHTML = 'Отправка...';
+
+            try {
+                const response = await fetch(`http://localhost:8082/api/v1/predictor/predict_csv/${uid}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>Предсказание: ${JSON.stringify(data.predicion, null, 2)}</span>`;
+                } else {
+                    let errorText = await response.text();
+                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+            }
+        });
     </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-from ml_pipeline.pipeline_manager import (
+from .ml_pipeline.pipeline_manager import (
     PredictionPipeline,
     TrainingPipeline,
 )

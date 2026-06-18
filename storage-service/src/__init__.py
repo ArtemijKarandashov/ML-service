@@ -9,21 +9,15 @@ from contextlib import asynccontextmanager
 from .config import Config
 from .routes import storage_router
 
-from .db import init_db
+from .db import init_db, check_database_health
 
 import os
-
-async def ensure_dirs():
-    if not os.path.exists("data/uploads"):
-        os.makedirs("data/uploads/", exist_ok=True)
-    
 
 @asynccontextmanager
 async def life_span(app: FastAPI):
     """Startup async functions are put here and are expected to be awaited"""
     print(f"Storage API is starting...")
     # await example_startup()
-    await ensure_dirs()
     await init_db()
     yield
     print(f"Storage API has been stopped")
@@ -53,3 +47,10 @@ app.add_middleware(
 #app.include_router(example_router, prefix="/api/{version}/example", tags=["example"])
 
 app.include_router(storage_router, prefix=f"/api/{version}/storage", tags=["storage_router"])
+
+@app.get("/health")
+async def health_check():
+    status = await check_database_health()
+    if not status:
+        return {"status": "unhealty"}
+    return {"status": "healthy"}

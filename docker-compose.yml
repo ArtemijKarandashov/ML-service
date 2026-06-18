@@ -33,7 +33,7 @@ services:
   client:
     image: nginx
     volumes:
-   - templates:/etc/nginx/templates
+      - templates:/etc/nginx/templates
     expose:
       - "80"
     environment:
@@ -55,10 +55,15 @@ services:
       - PREDICTOR_SERVICE_API=http://predictor-service:8083
     depends_on:
       - storage-service
-      - predictor-service
       - trainer-service
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   storage-service:
@@ -67,15 +72,22 @@ services:
       dockerfile: Dockerfile
     container_name: storage-service
     ports:
-      - "8001:8001"
+      - "8081:8081"
     environment:
-      - UPLOAD_DIR=/data/uploads
-      - SQLITE_URL=sqlite+aiosqlite:///data/storedfiles.db
+      - UPLOAD_DIR=/uploads
+      - SQLITE_URL=sqlite+aiosqlite:////db/storedfiles.db
       - STORAGE_SERVICE_PORT=8081
     volumes:
-      - data:/data               
+      - uploads:/uploads
+      - db:/db         
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 300s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   trainer-service:
@@ -92,6 +104,12 @@ services:
       - storage-service
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     # limits
     # deploy:
@@ -116,6 +134,8 @@ services:
 
 volumes:
   templates:
+  uploads:
+  db:
   certs:
   vhost:
   html:

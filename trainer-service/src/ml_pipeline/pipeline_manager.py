@@ -59,7 +59,7 @@ class TrainingPipeline:
         self,
         logger: object | None = None,  # provide logger object for logging purposes
         context: dict | None = None,  # provide context for specisic pipeline behavior
-    ) -> dict("model_bytes", "metrics" | None):
+    ):
         if logger is None:
             logger = get_logger()
 

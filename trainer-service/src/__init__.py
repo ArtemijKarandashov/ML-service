@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .config import Config
-from .routes import trainer_router
+from .routes import trainer_router, predictor_router
 
 # async def ensure_dirs():
 #     if not os.path.exists("data/uploads"):
@@ -48,6 +48,10 @@ app.add_middleware(
 # API ROUTERS
 # app.include_router(example_router, prefix="/api/{version}/example", tags=["example"])
 
-app.include_router(
-    trainer_router, prefix=f"/api/{version}/trainer", tags=["trainer_router"]
-)
+app.include_router(trainer_router, prefix=f"/api/{version}/trainer", tags=["trainer_router"])
+app.include_router(predictor_router, prefix=f"/api/{version}/predictor", tags=["predictor_router"])
+
+@app.get("/health")
+def health_check():
+    # Optional: Add database/Redis connectivity checks here
+    return {"status": "healthy"}

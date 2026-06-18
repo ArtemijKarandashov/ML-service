@@ -45,11 +45,11 @@ async def get(
             raise HTTPException(status_code=404, detail="PklFileEntry with specified uid does not exist.")
 
     except FileExistsError as e:
-        return HTTPException(status_code=404, detail="Cannot find file with specified uid.")
+        raise HTTPException(status_code=404, detail="Cannot find file with specified uid.")
     except PermissionError:
-        return HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
+        raise HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
     except OSError:
-        return HTTPException(status_code=500, detail="Unexpected error occured.")
+        raise HTTPException(status_code=500, detail="Unexpected error occured.")
 
 
 @storage_router.get("/get/{uid}", response_class=FileResponse)
@@ -69,11 +69,11 @@ async def get(
             raise HTTPException(status_code=404, detail="PklFileEntry with specified uid does not exist.")
 
     except FileExistsError as e:
-        return HTTPException(status_code=404, detail="Cannot find file with specified uid.")
+        raise HTTPException(status_code=404, detail="Cannot find file with specified uid.")
     except PermissionError:
-        return HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
-    except OSError:
-        return HTTPException(status_code=500, detail="Unexpected error occured.")
+        raise HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error occured. {e}")
 
 
 @storage_router.post("/store", response_class=JSONResponse)
@@ -103,11 +103,12 @@ async def store(
         return JSONResponse(status_code=200, content={"message": "File saved", "uid": uid})
     
     except FileExistsError:
-        return HTTPException(status_code=409, detail="File with set uid already exists.")
+        raise HTTPException(status_code=409, detail="File with set uid already exists.")
     except PermissionError:
-        return HTTPException(status_code=409, detail="Cannot create file. PermissionError.")
-    except OSError:
-        return HTTPException(status_code=500, detail="Unexpected error occured.")
+        raise HTTPException(status_code=409, detail="Cannot create file. PermissionError.")
+    except OSError as e:
+        raise e
+        raise HTTPException(status_code=500, detail=f"Unexpected error occured. {e}")
 
 
 @storage_router.delete("/delete/{uid}", response_class=HTMLResponse)
