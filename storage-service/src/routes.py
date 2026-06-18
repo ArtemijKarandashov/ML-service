@@ -76,6 +76,26 @@ async def get(
         raise HTTPException(status_code=500, detail=f"Unexpected error occured. {e}")
 
 
+@storage_router.get("/info-all")
+async def get_all(
+    session: AsyncSession = Depends(get_session)
+):
+    try:
+        files: PklFileEntry = await database_service.get_all_files(
+            session=session,
+        )
+
+        if files:
+            return files
+
+    except FileExistsError as e:
+        raise HTTPException(status_code=404, detail="Cannot find file with specified uid.")
+    except PermissionError:
+        raise HTTPException(status_code=409, detail="Cannot read file. PermissionError.")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error occured. {e}")
+
+
 @storage_router.post("/store", response_class=JSONResponse)
 async def store(
     pkl_file: UploadFile,

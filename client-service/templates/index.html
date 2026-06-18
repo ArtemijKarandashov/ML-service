@@ -1,221 +1,835 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Index page</title>
-    <meta charset="UTF-8"/>
+    <meta charset="UTF-8">
+    <title>ML Model Service - Предсказания</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h2, h3 {
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+            font-size: 13px;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        input[type="number"], input[type="text"], select {
+            width: 100%;
+            padding: 4px;
+            box-sizing: border-box;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        select {
+            background: white;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 15px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .btn-delete {
+            background-color: #FF4444;
+            color: white;
+        }
+        .btn-add {
+            background-color: #2196F3;
+            color: white;
+            margin-bottom: 20px;
+        }
+        .btn-predict {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-csv {
+            background-color: #FF9800;
+            color: white;
+        }
+        .response {
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+        .response pre {
+            margin: 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .info {
+            background-color: #e7f3ff;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #2196F3;
+            font-size: 14px;
+        }
+        .scroll-wrap {
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
-    <h1>Jinja2 test page</h1>
+    <div class="container">
+        <h2>ML Model Service API</h2>
+        <h3>Выбор модели для предсказания</h3>
+        
+        <button class="btn-add" onclick="uploadModel()">
+            Загрузить .pkl модель
+        </button>
 
-    <!-- ===================== БЛОК ЗАГРУЗКИ МОДЕЛИ ===================== -->
-    <h1>Загрузка файла</h1>
-    <form method="post" enctype="multipart/form-data" action="/api/v1/trainer/upload-model">
-        <label for="file">Выберите файл:</label>
-        <input type="file" name="file" id="file" required>
-        <br><br>
-        <button type="submit">Отправить</button>
-    </form>
+        <button class="btn-csv" onclick="trainModel()">
+            Обучить модель по CSV
+        </button>
 
-    {% if filename %}
-        <hr>
-        <p>Файл <strong>{{ filename }}</strong> успешно загружен!</p>
-    {% endif %}
+        <div class="info">
+        Обучение может занять от нескольких секунд до нескольких минут
+        в зависимости от размера CSV.
+        </div>
 
-    <!-- ===================== БЛОК ОПЕРАЦИЙ С МОДЕЛЬЮ ===================== -->
-    <div>
-        <label for="uid">UID файла:</label>
-        <input type="text" id="uid" placeholder="Введите uid" style="width: 300px;">
+        <table id="modelTable">
+            <thead>
+                <tr><th>Выбрать</th><th>UID</th><th>Имя файла</th></tr>
+            </thead>
+            <tbody id="modelTableBody">
+            </tbody>
+        </table>
+
+        <h3>Ввод признаков клиента</h3>
+        <div class="scroll-wrap">
+            <table id="featuresTable">
+                <thead>
+                    <tr>
+                        <th style="min-width:30px;">№</th>
+                        <th style="min-width:70px;">Возраст</th>
+                        <th style="min-width:80px;">Пол</th>
+                        <th style="min-width:100px;">Образование</th>
+                        <th style="min-width:80px;">Доход</th>
+                        <th style="min-width:70px;">Стаж (мес)</th>
+                        <th style="min-width:100px;">Тип жилья</th>
+                        <th style="min-width:100px;">Сумма кредита</th>
+                        <th style="min-width:100px;">Цель кредита</th>
+                        <th style="min-width:70px;">Ставка %</th>
+                        <th style="min-width:80px;">Доля дохода</th>
+                        <th style="min-width:100px;">Ист. кредита (мес)</th>
+                        <th style="min-width:80px;">Кред. рейтинг</th>
+                        <th style="min-width:80px;">Просрочки</th>
+                        <th style="min-width:70px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td><input type="number" class="person_age" value="30" step="0.1"></td>
+                        <td>
+                            <select class="person_gender">
+                                <option value="female">Женский</option>
+                                <option value="male">Мужской</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select class="person_education">
+                                <option value="High School">Среднее</option>
+                                <option value="Bachelor">Бакалавр</option>
+                                <option value="Master" selected>Магистр</option>
+                                <option value="Doctorate">Доктор</option>
+                            </select>
+                        </td>
+                        <td><input type="number" class="person_income" value="50000" step="0.01"></td>
+                        <td><input type="number" class="person_emp_exp" value="24"></td>
+                        <td>
+                            <select class="person_home_ownership">
+                                <option value="RENT">Аренда</option>
+                                <option value="OWN" selected>Собственность</option>
+                                <option value="MORTGAGE">Ипотека</option>
+                                <option value="OTHER">Другое</option>
+                            </select>
+                        </td>
+                        <td><input type="number" class="loan_amnt" value="100000" step="0.01"></td>
+                        <td>
+                            <select class="loan_intent">
+                                <option value="PERSONAL">Личное</option>
+                                <option value="EDUCATION" selected>Образование</option>
+                                <option value="MEDICAL">Медицина</option>
+                                <option value="VENTURE">Бизнес</option>
+                                <option value="HOMEIMPROVEMENT">Ремонт</option>
+                                <option value="DEBTCONSOLIDATION">Консолидация</option>
+                            </select>
+                        </td>
+                        <td><input type="number" class="loan_int_rate" value="12.5" step="0.01"></td>
+                        <td><input type="number" class="loan_percent_income" value="0.25" step="0.01"></td>
+                        <td><input type="number" class="cb_person_cred_hist_length" value="36"></td>
+                        <td><input type="number" class="credit_score" value="700"></td>
+                        <td>
+                            <select class="previous_loan_defaults_on_file">
+                                <option value="No" selected>Нет</option>
+                                <option value="Yes">Да</option>
+                            </select>
+                        </td>
+                        <td><button class="btn-delete" onclick="deleteRow(this)">✕</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn-add" onclick="addRow()">[+] Добавить запись</button>
+
+        <h3>Действия с предсказаниями</h3>
+        <button class="btn-predict" onclick="makePrediction()"> Сделать предсказание</button>
+        <button class="btn-csv" onclick="uploadCSV()"> Загрузить CSV</button>
+        
+        <div class="info" id="infoMessage">
+             Выберите модель из таблицы выше для активации действий
+        </div>
+
+        <div class="response">
+            <strong>Ответ от модели:</strong>
+            <pre id="responseText">Тут будет результат предсказания...</pre>
+        </div>
     </div>
-    <br>
 
-    <button onclick="deleteFile()">Удалить файл</button>
-    <button onclick="downloadFile()">Скачать файл</button>
-
-    <hr>
-    <div id="result" style="font-family: monospace; white-space: pre-wrap;"></div>
-
-    <!-- ===================== НОВЫЙ БЛОК: ОБУЧЕНИЕ ===================== -->
-    <hr>
-    <h1>Обучение модели (train)</h1>
-    <form id="trainForm" enctype="multipart/form-data">
-        <label for="trainCsv">CSV файл для обучения:</label>
-        <input type="file" name="csv_file" id="trainCsv" accept=".csv" required>
-        <br><br>
-        <button type="submit">Обучить</button>
-    </form>
-    <div id="trainResult" style="font-family: monospace; white-space: pre-wrap;"></div>
-
-    <!-- ===================== НОВЫЙ БЛОК: ПРЕДСКАЗАНИЕ ПО JSON ===================== -->
-    <hr>
-    <h1>Предсказание по JSON (predict)</h1>
-    <div>
-        <label for="predictUid">UID модели:</label>
-        <input type="text" id="predictUid" placeholder="Введите uid" style="width: 300px;">
-    </div>
-    <div>
-        <label for="jsonData">Данные (JSON-массив объектов):</label><br>
-        <textarea id="jsonData" rows="6" cols="60" placeholder='[{"person_age": 25, ...}, ...]' style="font-family: monospace;"></textarea>
-    </div>
-    <br>
-    <button onclick="predictJson()">Отправить</button>
-    <div id="predictJsonResult" style="font-family: monospace; white-space: pre-wrap;"></div>
-
-    <!-- ===================== НОВЫЙ БЛОК: ПРЕДСКАЗАНИЕ ПО CSV ===================== -->
-    <hr>
-    <h1>Предсказание по CSV (predict_csv)</h1>
-    <div>
-        <label for="predictCsvUid">UID модели:</label>
-        <input type="text" id="predictCsvUid" placeholder="Введите uid" style="width: 300px;">
-    </div>
-    <form id="predictCsvForm" enctype="multipart/form-data">
-        <label for="predictCsvFile">CSV файл для предсказания:</label>
-        <input type="file" name="csv_file" id="predictCsvFile" accept=".csv" required>
-        <br><br>
-        <button type="submit">Отправить</button>
-    </form>
-    <div id="predictCsvResult" style="font-family: monospace; white-space: pre-wrap;"></div>
-
-    <!-- ===================== СКРИПТЫ ===================== -->
     <script>
-        // ---------- Существующие функции ----------
-        async function deleteFile() {
-            const uid = document.getElementById('uid').value.trim();
-            const resultDiv = document.getElementById('result');
-            if (!uid) {
-                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
-                return;
-            }
-            resultDiv.innerHTML = 'Удаление...';
+        const API_URL = "http://localhost:8080";
+        async function loadModels() {
             try {
-                const response = await fetch(`/api/v1/trainer/delete-model/${uid}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message} (uid: ${data.uid})</span>`;
-                } else {
-                    let errorText = await response.text();
-                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+
+                const response = await fetch(
+                    //`${API_URL}/info-all`
+                    `http://localhost:8081/api/v1/storage/info-all`
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Не удалось получить список моделей"
+                    );
                 }
-            } catch (error) {
-                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
-            }
-        }
 
-        function downloadFile() {
-            const uid = document.getElementById('uid').value.trim();
-            if (!uid) {
-                alert('Введите uid');
-                return;
-            }
-            window.location.href = `/api/v1/trainer/get-model/${uid}`;
-        }
+                const models = await response.json();
 
-        // ---------- НОВАЯ ФУНКЦИЯ: ОБУЧЕНИЕ ----------
-        document.getElementById('trainForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const resultDiv = document.getElementById('trainResult');
-            resultDiv.innerHTML = 'Отправка...';
+                const tbody =
+                    document.getElementById(
+                        "modelTableBody"
+                    );
 
-            try {
-                const response = await fetch('http://localhost:8082/api/v1/trainer/train', {
-                    method: 'POST',
-                    body: formData
+                tbody.innerHTML = "";
+
+                models.forEach(model => {
+
+                    const row =
+                        document.createElement("tr");
+
+                    row.innerHTML = `
+                        <td>
+                            <input
+                                type="radio"
+                                name="model"
+                                value="${model.uid}"
+                            >
+                        </td>
+                        <td>${model.uid}</td>
+                        <td>${model.name}</td>
+                    `;
+
+                    tbody.appendChild(row);
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>UID: ${data.uid}</span>`;
-                } else {
-                    let errorText = await response.text();
-                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
-                }
+                attachModelEvents();
+
             } catch (error) {
-                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+
+                console.error(error);
+
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    error.message;
             }
+        } 
+
+        let rowCounter = 1;
+        
+        // === ОТСЛЕЖИВАНИЕ ВЫБОРА МОДЕЛИ ===
+        function attachModelEvents() {
+
+    document
+        .querySelectorAll(
+            'input[name="model"]'
+        )
+        .forEach(radio => {
+
+            radio.addEventListener(
+                'change',
+                function() {
+
+                    const info =
+                        document.getElementById(
+                            'infoMessage'
+                        );
+
+                    info.innerHTML =
+                        'Модель выбрана. Можно выполнять предсказания.';
+
+                    info.style.backgroundColor =
+                        '#d4edda';
+
+                    info.style.borderLeftColor =
+                        '#28a745';
+                }
+            );
         });
-
-        // ---------- НОВАЯ ФУНКЦИЯ: ПРЕДСКАЗАНИЕ ПО JSON (исправлено) ----------
-        async function predictJson() {
-            const uid = document.getElementById('predictUid').value.trim();
-            const jsonText = document.getElementById('jsonData').value.trim();
-            const resultDiv = document.getElementById('predictJsonResult');
-
-            if (!uid) {
-                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
-                return;
-            }
-            if (!jsonText) {
-                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите JSON-данные</span>';
-                return;
-            }
-
-            let jsonData;
-            try {
-                jsonData = JSON.parse(jsonText);
-                if (!Array.isArray(jsonData)) {
-                    throw new Error('Данные должны быть массивом объектов');
+}
+        
+        // === ДОБАВЛЕНИЕ СТРОКИ ===
+        function addRow() {
+            rowCounter++;
+            const tbody = document.querySelector('#featuresTable tbody');
+            const newRow = tbody.insertRow();
+            newRow.innerHTML = `
+                <td>${rowCounter}</td>
+                <td><input type="number" class="person_age" value="30" step="0.1"></td>
+                <td>
+                    <select class="person_gender">
+                        <option value="female">Женский</option>
+                        <option value="male">Мужской</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="person_education">
+                        <option value="High School">Среднее</option>
+                        <option value="Bachelor">Бакалавр</option>
+                        <option value="Master" selected>Магистр</option>
+                        <option value="Doctorate">Доктор</option>
+                    </select>
+                </td>
+                <td><input type="number" class="person_income" value="50000" step="0.01"></td>
+                <td><input type="number" class="person_emp_exp" value="24"></td>
+                <td>
+                    <select class="person_home_ownership">
+                        <option value="RENT">Аренда</option>
+                        <option value="OWN" selected>Собственность</option>
+                        <option value="MORTGAGE">Ипотека</option>
+                        <option value="OTHER">Другое</option>
+                    </select>
+                </td>
+                <td><input type="number" class="loan_amnt" value="100000" step="0.01"></td>
+                <td>
+                    <select class="loan_intent">
+                        <option value="PERSONAL">Личное</option>
+                        <option value="EDUCATION" selected>Образование</option>
+                        <option value="MEDICAL">Медицина</option>
+                        <option value="VENTURE">Бизнес</option>
+                        <option value="HOMEIMPROVEMENT">Ремонт</option>
+                        <option value="DEBTCONSOLIDATION">Консолидация</option>
+                    </select>
+                </td>
+                <td><input type="number" class="loan_int_rate" value="12.5" step="0.01"></td>
+                <td><input type="number" class="loan_percent_income" value="0.25" step="0.01"></td>
+                <td><input type="number" class="cb_person_cred_hist_length" value="36"></td>
+                <td><input type="number" class="credit_score" value="700"></td>
+                <td>
+                    <select class="previous_loan_defaults_on_file">
+                        <option value="No" selected>Нет</option>
+                        <option value="Yes">Да</option>
+                    </select>
+                </td>
+                <td><button class="btn-delete" onclick="deleteRow(this)">X</button></td>
+            `;
+        }
+        
+        // === УДАЛЕНИЕ СТРОКИ ===
+        function deleteRow(btn) {
+            const row = btn.closest('tr');
+            const tbody = row.parentElement;
+            if (tbody.children.length > 1) {
+                tbody.removeChild(row);
+                // Перенумерация
+                for (let i = 0; i < tbody.children.length; i++) {
+                    tbody.children[i].cells[0].innerText = i + 1;
                 }
-            } catch (e) {
-                resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка в JSON: ${e.message}</span>`;
-                return;
-            }
-
-            // Формируем тело с полем "data"
-            const payload = { data: jsonData };
-
-            resultDiv.innerHTML = 'Отправка...';
-            try {
-                const response = await fetch(`http://localhost:8082/api/v1/predictor/predict/${uid}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>Предсказание: ${JSON.stringify(data.predicion, null, 2)}</span>`;
-                } else {
-                    let errorText = await response.text();
-                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+                rowCounter = tbody.children.length;
+            } else {
+                alert("Нельзя удалить последнюю запись!");
             }
         }
+        
+        // === ПОЛУЧЕНИЕ ВЫБРАННОЙ МОДЕЛИ ===
+        function getSelectedModel() {
+            const selected = document.querySelector('input[name="model"]:checked');
+            if (!selected) {
+                alert("Пожалуйста, выберите модель!");
+                return null;
+            }
+            return {
+                uid: selected.value,
+                name: selected.closest('tr').cells[2].innerText
+            };
+        }
+        
+        // === СБОР ДАННЫХ ИЗ ТАБЛИЦЫ ===
+        function getClientsFromTable() {
+            const clients = [];
+            const rows = document.querySelectorAll('#featuresTable tbody tr');
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                clients.push({
+                    person_age: parseFloat(row.querySelector('.person_age').value) || 0,
+                    person_gender: row.querySelector('.person_gender').value,
+                    person_education: row.querySelector('.person_education').value,
+                    person_income: parseFloat(row.querySelector('.person_income').value) || 0,
+                    person_emp_exp: parseFloat(row.querySelector('.person_emp_exp').value) || 0,
+                    person_home_ownership: row.querySelector('.person_home_ownership').value,
+                    loan_amnt: parseFloat(row.querySelector('.loan_amnt').value) || 0,
+                    loan_intent: row.querySelector('.loan_intent').value,
+                    loan_int_rate: parseFloat(row.querySelector('.loan_int_rate').value) || 0,
+                    loan_percent_income: parseFloat(row.querySelector('.loan_percent_income').value) || 0,
+                    cb_person_cred_hist_length: parseFloat(row.querySelector('.cb_person_cred_hist_length').value) || 0,
+                    credit_score: parseFloat(row.querySelector('.credit_score').value) || 0,
+                    previous_loan_defaults_on_file: row.querySelector('.previous_loan_defaults_on_file').value
+                });
+            }
+            return clients;
+        }
+        
+        // === ПАРСИНГ CSV В МАССИВ ОБЪЕКТОВ ===
+        function parseCSVToObjects(csvData) {
+            const lines = csvData.trim().split('\n').filter(line => line.trim());
+            if (lines.length < 2) {
+                alert("CSV файл пуст или содержит только заголовки!");
+                return [];
+            }
+            
+            // Читаем заголовки и приводим к нижнему регистру
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            // Проверяем наличие обязательных колонок
+            const required = ['person_age', 'person_gender', 'person_education', 'person_income', 
+                             'person_emp_exp', 'person_home_ownership', 'loan_amnt', 'loan_intent',
+                             'loan_int_rate', 'loan_percent_income', 'cb_person_cred_hist_length',
+                             'credit_score', 'previous_loan_defaults_on_file'];
+            
+                             
+            const missing = required.filter(col => !headers.includes(col));
+            if (missing.length > 0) {
+                alert(`В CSV отсутствуют колонки: ${missing.join(', ')}`);
+                return [];
+            }
+            
+            const clients = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                const client = {};
+                
+                required.forEach((col, idx) => {
+                    const colIndex = headers.indexOf(col);
+                    const rawValue = values[colIndex] || '';
+                    
+                    // Определяем тип данных на основе колонки
+                    if (['person_gender', 'person_education', 'person_home_ownership', 
+                         'loan_intent', 'previous_loan_defaults_on_file'].includes(col)) {
+                        client[col] = rawValue; // Строковые значения
+                    } else {
+                        client[col] = parseFloat(rawValue) || 0; // Числовые
+                    }
+                });
+                
+                clients.push(client);
+            }
+            return clients;
+        }
+        
+        function renderPredictionResult(
+            result,
+            model,
+            source
+        ) {
 
-        // ---------- НОВАЯ ФУНКЦИЯ: ПРЕДСКАЗАНИЕ ПО CSV ----------
-        document.getElementById('predictCsvForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const uid = document.getElementById('predictCsvUid').value.trim();
-            const resultDiv = document.getElementById('predictCsvResult');
+            const responseDiv =
+                document.getElementById(
+                    "responseText"
+                );
 
-            if (!uid) {
-                resultDiv.innerHTML = '<span style="color: red;">Ошибка: введите uid</span>';
+            const predictions =
+                result.prediction ||
+                result.predicion;
+
+            if (!predictions) {
+
+                responseDiv.textContent =
+                    JSON.stringify(
+                        result,
+                        null,
+                        2
+                    );
+
                 return;
             }
 
-            const formData = new FormData(this);
-            resultDiv.innerHTML = 'Отправка...';
+            let text = "";
+
+            text += `Модель: ${model.name}\n`;
+            text += `UID: ${model.uid}\n`;
+            text += `Источник: ${source}\n\n`;
+
+            let approved = 0;
+
+            predictions.forEach(
+                (value, index) => {
+
+                    const approvedText =
+                        Number(value) === 1
+                            ? "ОДОБРЕНО"
+                            : "ОТКАЗАНО";
+
+                    if (Number(value) === 1)
+                        approved++;
+
+                    text +=
+                        `Клиент #${index + 1}: ${approvedText}\n`;
+                }
+            );
+
+            text += "\n";
+
+            text +=
+                `Одобрено: ${approved}\n`;
+
+            text +=
+                `Отказано: ${
+                    predictions.length - approved
+                }\n`;
+
+            responseDiv.textContent =
+                text;
+        }
+        
+        // === ОСНОВНАЯ ФУНКЦИЯ ПРЕДСКАЗАНИЯ ===
+        async function makePrediction() {
+            const model =
+                getSelectedModel();
+            if (!model)
+                return;
+            const clients =
+                getClientsFromTable();
+            if (!clients.length) {
+                alert(
+                    "Нет данных для предсказания"
+                );
+                return;
+            }
+            const responseDiv =
+                document.getElementById(
+                    "responseText"
+                );
+            responseDiv.textContent =
+                "Выполняется предсказание...";
+            try {
+                const response =
+                    await fetch(
+                        //`${API_URL}/predict/${model.uid}`,
+                        `http://localhost:8082/api/v1/predictor/predict/${model.uid}`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+                            body: JSON.stringify({
+                                data: clients
+                            })
+                        }
+                    );
+                const result =
+                    await response.json();
+                if (!response.ok) {
+                    throw new Error(
+                        result.detail ||
+                        "Ошибка предсказания"
+                    );
+                }
+                renderPredictionResult(
+                    result,
+                    model,
+                    "Табличный ввод"
+                );
+            } catch (error) {
+                responseDiv.textContent =
+                    error.message;
+            }
+        }
+        
+        // === ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ===
+        function renderResults(results, model, source) {
+            const responseDiv = document.getElementById('responseText');
+            let result = ` Модель: ${model.name}\n`;
+            result += ` UID: ${model.uid}\n`;
+            result += ` Источник: ${source}\n`;
+            result += ` Количество записей: ${results.length}\n`;
+            result += "═".repeat(65) + "\n\n";
+            
+            results.forEach((client, index) => {
+                result += ` Клиент #${index + 1}:\n`;
+                result += `   Возраст: ${client.person_age}\n`;
+                result += `   Пол: ${client.person_gender === 'female' ? 'Женский' : 'Мужской'}\n`;
+                result += `   Образование: ${client.person_education}\n`;
+                result += `   Доход: ${client.person_income.toLocaleString()} ₽\n`;
+                result += `   Стаж: ${client.person_emp_exp} мес.\n`;
+                result += `   Жилье: ${client.person_home_ownership}\n`;
+                result += `   Сумма кредита: ${client.loan_amnt.toLocaleString()} ₽\n`;
+                result += `   Цель: ${client.loan_intent}\n`;
+                result += `   Ставка: ${client.loan_int_rate}%\n`;
+                result += `   Доля дохода: ${(client.loan_percent_income * 100).toFixed(1)}%\n`;
+                result += `   Ист. кредита: ${client.cb_person_cred_hist_length} мес.\n`;
+                result += `   Кред. рейтинг: ${client.credit_score}\n`;
+                result += `   Просрочки: ${client.previous_loan_defaults_on_file === 'Yes' ? 'Были' : 'Нет'}\n`;
+                result += `   Скоринг: ${client.score}%\n`;
+                result += `   Решение: ${client.approval} (вероятность: ${client.probability})\n`;
+                result += "─".repeat(50) + "\n";
+            });
+            
+            // Статистика
+            const approved = results.filter(r => r.approval === 'ОДОБРЕНО').length;
+            result += `\n Итоговая статистика:\n`;
+            result += `  Одобрено: ${approved} из ${results.length} (${(approved/results.length*100).toFixed(1)}%)\n`;
+            result += `  Отказано: ${results.length - approved} из ${results.length} (${((results.length-approved)/results.length*100).toFixed(1)}%)\n`;
+            
+            responseDiv.innerHTML = result;
+        }
+        
+        // === ЗАГРУЗКА И ОБРАБОТКА CSV ===
+        async function uploadCSV() {
+        const model =
+            getSelectedModel();
+        if (!model)
+            return;
+        const input =
+            document.createElement(
+                "input"
+            );
+
+        input.type = "file";
+        input.accept = ".csv";
+
+        input.onchange =
+            async event => {
+
+                const file =
+                    event.target.files[0];
+
+                if (!file)
+                    return;
+
+                const formData =
+                    new FormData();
+
+                formData.append(
+                    "csv_file",
+                    file
+                );
+
+                try {
+
+                    document
+                        .getElementById(
+                            "responseText"
+                        )
+                        .textContent =
+                        "Загрузка CSV...";
+
+                    const response =
+                        await fetch(
+                            //`${API_URL}/predict_csv/${model.uid}`,
+                            `http://localhost:8082/api/v1/predictor/predict_csv/${model.uid}`,
+
+                            {
+                                method: "POST",
+                                body: formData
+                            }
+                        );
+
+                    const result =
+                        await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            result.detail ||
+                            "Ошибка предсказания"
+                        );
+                    }
+
+                    renderPredictionResult(
+                        result,
+                        model,
+                        `CSV (${file.name})`
+                    );
+
+                } catch (error) {
+
+                    document
+                        .getElementById(
+                            "responseText"
+                        )
+                        .textContent =
+                        error.message;
+                }
+            };
+
+        input.click();
+    }
+    async function uploadModel() {
+
+        const input = document.createElement("input");
+
+        input.type = "file";
+        input.accept = ".pkl";
+
+        input.onchange = async (event) => {
+
+            const file = event.target.files[0];
+
+            if (!file)
+                return;
+
+            const formData = new FormData();
+
+            formData.append(
+                "file",
+                file
+            );
 
             try {
-                const response = await fetch(`http://localhost:8082/api/v1/predictor/predict_csv/${uid}`, {
-                    method: 'POST',
-                    body: formData
-                });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    resultDiv.innerHTML = `<span style="color: green;">✅ Успешно: ${data.message}<br>Предсказание: ${JSON.stringify(data.predicion, null, 2)}</span>`;
-                } else {
-                    let errorText = await response.text();
-                    resultDiv.innerHTML = `<span style="color: red;">❌ Ошибка ${response.status}: ${errorText}</span>`;
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    "Загрузка модели...";
+
+                const response = await fetch(
+                    //`${API_URL}/upload-model`,
+                    `http://localhost:8080/api/v1/trainer/upload-model`,
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+                const result =
+                    await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        result.detail ||
+                        "Ошибка загрузки модели"
+                    );
                 }
+
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    `Модель успешно загружена\nUID: ${result.uid}`;
+
+                await loadModels();
+
             } catch (error) {
-                resultDiv.innerHTML = `<span style="color: red;">❌ Сетевая ошибка: ${error.message}</span>`;
+
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    error.message;
             }
-        });
+        };
+
+        input.click();
+    }
+    
+    async function trainModel() {
+        const input = document.createElement("input");
+
+        input.type = "file";
+        input.accept = ".csv";
+        input.onchange = async (event) => {
+
+            const file = event.target.files[0];
+            if (!file)
+                return;
+            const formData = new FormData();
+
+            formData.append(
+                "csv_file",
+                file
+            );
+
+            try {
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    "Обучение модели...\nЭто может занять некоторое время.";
+                const response = await fetch(
+                    //`${API_URL}/train`,
+                    `http://localhost:8082/api/v1/trainer/train`,
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+                const result =
+                    await response.json();
+                if (!response.ok) {
+                    throw new Error(
+                        result.detail ||
+                        "Ошибка обучения"
+                    );
+                }
+
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    `Модель успешно обучена\nUID: ${result.uid}`;
+
+                await loadModels();
+
+            } catch (error) {
+
+                document.getElementById(
+                    "responseText"
+                ).textContent =
+                    error.message;
+            }
+        };
+        input.click();
+    }
+
+        window.addEventListener(
+            "load",
+            loadModels
+        );    
     </script>
 </body>
 </html>

@@ -8,6 +8,15 @@ from .db import PklFileEntry
 
 class PklFileService:
 
+    async def get_all_files(
+            self,
+            session: AsyncSession
+        ):
+        stmt = select(PklFileEntry)
+        result = await session.exec(stmt)
+        return result.all()
+        
+
     async def get_pkl_file_entry(
             self, 
             session: AsyncSession, 

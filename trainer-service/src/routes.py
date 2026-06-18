@@ -88,6 +88,7 @@ async def predict(
         writer = csv.DictWriter(buffer, fieldnames=data[0].keys())
         writer.writeheader()
         writer.writerows(data)
+        print(buffer.getvalue().encode('utf-8'))
         csv_bytes = buffer.getvalue().encode('utf-8')
 
         model =  await storage_service.get_pkl_file(uid=uid)
@@ -103,7 +104,7 @@ async def predict(
         }
         return JSONResponse(content=response, status_code=200)
     except:
-        pass
+        raise HTTPException(status_code=500, detail="Unecpected error")
 
 @predictor_router.post("/predict_csv/{uid}")
 async def predict_csv(
@@ -125,5 +126,4 @@ async def predict_csv(
         }
         return JSONResponse(content=response, status_code=200)
     except Exception as e:
-        raise e
-        raise HTTPException(status_code=500, detail=f"{e}")
+        raise HTTPException(status_code=500, detail="Unecpected error")
