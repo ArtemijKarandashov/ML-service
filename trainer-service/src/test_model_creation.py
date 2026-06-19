@@ -3,7 +3,7 @@ from ml_pipeline.pipeline_manager import (
 )
 
 if __name__ == "__main__":
-    with open("trainer-service/src/ml_pipeline/data/loan_data.csv", "rb") as file:
+    with open("loan_data.csv", "rb") as file:
         train_csv_bytes = file.read()
 
     trainer = TrainingPipeline(train_csv_bytes)
