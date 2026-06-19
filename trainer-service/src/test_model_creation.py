@@ -1,5 +1,5 @@
-# import json
-import numpy as np
+import json
+
 from ml_pipeline.pipeline_manager import (
     TrainingPipeline,
 )
@@ -19,5 +19,4 @@ if __name__ == "__main__":
 
     with open("dist/metrics.txt", "w") as metrics_file:
         # metrics_string = json.dumps(metrics)
-        metrics_string = np.array2string(metrics)
-        metrics_file.write(metrics_string)
+        metrics_file.writelines(f"{key}: {value}\n" for key, value in metrics.items())
