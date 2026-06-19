@@ -27,6 +27,7 @@ jobs:
       
       - name: Run training pipeline
         run: |
+          pwd
           mkdir dist
           python test_model_creation.py
 
