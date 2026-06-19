@@ -30,8 +30,9 @@ jobs:
           mkdir dist
           touch dist/model.pkl
           touch dist/metrics.txt
+          cd trainer-service
           python -c '
-          from trainer-service/src/ml_pipeline.pipeline_manager import (
+          from src.ml_pipeline.pipeline_manager import (
               TrainingPipeline,
           )
 
