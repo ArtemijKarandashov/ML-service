@@ -30,28 +30,7 @@ jobs:
           mkdir dist
           touch dist/model.pkl
           touch dist/metrics.txt
-          cd trainer-service
-          python -c '
-          from src.ml_pipeline.pipeline_manager import (
-              TrainingPipeline,
-          )
-
-          if __name__ == "__main__":
-              with open("loan_data.csv", "rb") as file:
-                  train_csv_bytes = file.read()
-
-              trainer = TrainingPipeline(train_csv_bytes)
-              trainer.run_pipeline()
-
-              model_bytes = trainer.get_model_bytes()
-              metrics = trainer.get_metrics()
-
-              with open("dist/model.pkl", "wb") as model_file:
-                  file.write(model_file)
-
-              with open("dist/metrics.txt", "w") as metrics_file:
-                  file.write(metrics_file)
-          '
+          python trainer-service/src/test_model_creation.py
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

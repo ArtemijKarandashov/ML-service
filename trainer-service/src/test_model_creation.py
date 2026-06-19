@@ -13,7 +13,7 @@ if __name__ == "__main__":
     metrics = trainer.get_metrics()
 
     with open("dist/model.pkl", "wb") as model_file:
-        file.write(model_file)
+        model_file.write(model_bytes)
 
     with open("dist/metrics.txt", "w") as metrics_file:
-        file.write(metrics_file)
+        metrics_file.write(metrics)
