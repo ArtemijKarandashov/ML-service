@@ -28,7 +28,7 @@ jobs:
       - name: Run training pipeline
         run: |
           mkdir dist
-          python test_model_creation.py
+          python trainer-service/src/test_model_creation.py
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
