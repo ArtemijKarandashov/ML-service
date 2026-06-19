@@ -100,7 +100,7 @@ async def predict(
         prediction = prediction_pipeline.get_prediction()
         response = {
             "message": "Successeful prediction",
-            "predicion": prediction
+            "predicion": prediction.tolist()
         }
         return JSONResponse(content=response, status_code=200)
     except:
