@@ -144,4 +144,14 @@ def encode_columns(df_sanitized: pd.DataFrame, encoding_strategy: dict) -> pd.Da
                 axis=1,
             )
 
+    for column in prediction_allowed_columns:
+        if column not in df_encoded:
+            df_encoded[column] = 0
+
+    df_encoded = df_encoded[
+        training_allowed_columns
+        if "loan_status" in df_encoded
+        else prediction_allowed_columns
+    ]
+
     return df_encoded
