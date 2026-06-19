@@ -7,7 +7,10 @@ from ml_pipeline.pipeline_manager import (
 
 if __name__ == "__main__":
     run_training = False
-    run_prediction = True
+    run_prediction = False
+
+    with open("ml_pipeline/data/prediction_data_copy.csv", "rb") as file:
+        pred_csv_bytes = file.read()
 
     with open("ml_pipeline/data/prediction_data_copy.csv", "rb") as file:
         pred_csv_bytes = file.read()
